@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
-type DynError = Box<dyn Error + Send + Sync>;
+type DynError = Box<dyn Error>;
 
 pub fn run() -> Result<(), DynError> {
     match parse_mode(env::args_os().skip(1)) {
