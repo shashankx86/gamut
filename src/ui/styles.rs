@@ -1,7 +1,7 @@
 use super::constants::{ITEM_RADIUS, PANEL_RADIUS};
-use super::launcher::{Launcher, Message};
-use iced::widget::{button, container, scrollable, text, text_input};
-use iced::{Background, Border, Color, Element, Shadow, Theme};
+use super::launcher::Launcher;
+use iced::widget::{button, container, scrollable, text_input};
+use iced::{Background, Border, Color, Shadow, Theme};
 
 pub(super) fn launcher_base_style(_state: &Launcher, _theme: &Theme) -> iced::theme::Style {
     iced::theme::Style {
@@ -17,9 +17,14 @@ pub(super) fn backdrop_style() -> container::Style {
 pub(super) fn panel_style() -> container::Style {
     container::Style {
         text_color: Some(Color::from_rgb(0.92, 0.93, 0.95)),
-        background: Some(Background::Color(Color::from_rgba(0.12, 0.12, 0.13, 0.98))),
+        background: Some(Background::Color(Color::from_rgba(
+            21.0 / 255.0,
+            21.0 / 255.0,
+            21.0 / 255.0,
+            0.97,
+        ))),
         border: Border {
-            color: Color::from_rgba(0.51, 0.53, 0.58, 0.50),
+            color: Color::from_rgba(26.0 / 255.0, 27.0 / 255.0, 32.0 / 255.0, 0.76),
             width: 1.0,
             radius: PANEL_RADIUS.into(),
         },
@@ -28,94 +33,67 @@ pub(super) fn panel_style() -> container::Style {
     }
 }
 
-pub(super) fn header_style() -> container::Style {
+pub(super) fn divider_style() -> container::Style {
     container::Style {
-        border: Border {
-            color: Color::from_rgba(0.30, 0.32, 0.36, 0.70),
-            width: 1.0,
-            radius: iced::border::Radius::default().top(PANEL_RADIUS),
-        },
-        background: Some(Background::Color(Color::from_rgba(0.13, 0.13, 0.14, 0.98))),
+        background: Some(Background::Color(Color::from_rgba(
+            46.0 / 255.0,
+            46.0 / 255.0,
+            46.0 / 255.0,
+            0.72,
+        ))),
         ..container::Style::default()
     }
 }
 
-pub(super) fn footer_style() -> container::Style {
+pub(super) fn bottom_strip_style() -> container::Style {
     container::Style {
-        border: Border {
-            color: Color::from_rgba(0.30, 0.32, 0.36, 0.70),
-            width: 1.0,
-            radius: iced::border::Radius::default().bottom(PANEL_RADIUS),
-        },
-        background: Some(Background::Color(Color::from_rgba(0.13, 0.13, 0.14, 0.99))),
+        text_color: Some(Color::from_rgb(0.73, 0.75, 0.79)),
         ..container::Style::default()
     }
-}
-
-pub(super) fn app_icon_style() -> container::Style {
-    container::Style {
-        background: Some(Background::Color(Color::from_rgb(0.19, 0.22, 0.27))),
-        border: Border {
-            color: Color::from_rgba(0.44, 0.52, 0.64, 0.65),
-            width: 1.0,
-            radius: 6.0.into(),
-        },
-        ..container::Style::default()
-    }
-}
-
-pub(super) fn footer_key_chip(label: &'static str) -> Element<'static, Message> {
-    container(
-        text(label)
-            .size(11)
-            .color(Color::from_rgb(0.84, 0.86, 0.89)),
-    )
-    .padding([2, 6])
-    .style(|_| container::Style {
-        background: Some(Background::Color(Color::from_rgb(0.23, 0.24, 0.27))),
-        border: Border {
-            color: Color::from_rgba(0.55, 0.57, 0.62, 0.65),
-            width: 1.0,
-            radius: 6.0.into(),
-        },
-        ..container::Style::default()
-    })
-    .into()
 }
 
 pub(super) fn search_input_style(_theme: &Theme, status: text_input::Status) -> text_input::Style {
-    let border_color = match status {
-        text_input::Status::Focused { .. } => Color::from_rgb(0.55, 0.58, 0.64),
-        text_input::Status::Hovered => Color::from_rgb(0.42, 0.45, 0.50),
-        _ => Color::from_rgb(0.32, 0.34, 0.38),
+    let placeholder = match status {
+        text_input::Status::Focused { .. } => Color::from_rgb(0.62, 0.64, 0.68),
+        _ => Color::from_rgb(0.53, 0.55, 0.59),
     };
 
     text_input::Style {
-        background: Background::Color(Color::from_rgba(0.14, 0.14, 0.15, 0.98)),
+        background: Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0)),
         border: Border {
-            color: border_color,
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: 8.0.into(),
         },
-        icon: Color::from_rgb(0.56, 0.58, 0.63),
-        placeholder: Color::from_rgb(0.50, 0.52, 0.56),
-        value: Color::from_rgb(0.96, 0.96, 0.97),
-        selection: Color::from_rgb(0.29, 0.33, 0.42),
+        icon: Color::from_rgb(0.48, 0.50, 0.55),
+        placeholder,
+        value: Color::from_rgb(0.94, 0.95, 0.97),
+        selection: Color::from_rgba(0.31, 0.31, 0.34, 0.88),
     }
 }
 
 pub(super) fn result_button_style(status: button::Status, first_row: bool) -> button::Style {
     let active_bg = if first_row {
-        Color::from_rgba(0.24, 0.24, 0.25, 0.96)
+        Color::from_rgba(32.0 / 255.0, 32.0 / 255.0, 32.0 / 255.0, 0.92)
     } else {
         Color::from_rgba(0.0, 0.0, 0.0, 0.0)
     };
 
-    let hover_bg = Color::from_rgba(0.22, 0.23, 0.25, 0.96);
+    let hover_bg = if first_row {
+        Color::from_rgba(38.0 / 255.0, 38.0 / 255.0, 38.0 / 255.0, 0.94)
+    } else {
+        Color::from_rgba(24.0 / 255.0, 24.0 / 255.0, 24.0 / 255.0, 0.28)
+    };
 
     let background = match status {
         button::Status::Hovered => hover_bg,
-        button::Status::Pressed => Color::from_rgba(0.26, 0.27, 0.29, 0.96),
+        button::Status::Pressed => {
+            if first_row {
+                Color::from_rgba(45.0 / 255.0, 45.0 / 255.0, 45.0 / 255.0, 0.94)
+            } else {
+                Color::from_rgba(32.0 / 255.0, 32.0 / 255.0, 32.0 / 255.0, 0.55)
+            }
+        }
         _ => active_bg,
     };
 
@@ -123,7 +101,7 @@ pub(super) fn result_button_style(status: button::Status, first_row: bool) -> bu
         background: Some(Background::Color(background)),
         text_color: Color::from_rgb(0.94, 0.95, 0.96),
         border: Border {
-            color: Color::from_rgba(0.39, 0.41, 0.45, 0.42),
+            color: Color::from_rgba(57.0 / 255.0, 57.0 / 255.0, 57.0 / 255.0, 0.56),
             width: if first_row { 1.0 } else { 0.0 },
             radius: ITEM_RADIUS.into(),
         },
@@ -133,27 +111,56 @@ pub(super) fn result_button_style(status: button::Status, first_row: bool) -> bu
 
 pub(super) fn results_scroll_style(theme: &Theme, status: scrollable::Status) -> scrollable::Style {
     let mut style = scrollable::default(theme, status);
+    let (scroller_background, scroller_border) = match status {
+        scrollable::Status::Dragged {
+            is_vertical_scrollbar_dragged: true,
+            ..
+        } => (
+            Color::from_rgba(68.0 / 255.0, 68.0 / 255.0, 68.0 / 255.0, 0.90),
+            Color::from_rgba(95.0 / 255.0, 95.0 / 255.0, 95.0 / 255.0, 0.62),
+        ),
+        scrollable::Status::Hovered {
+            is_vertical_scrollbar_hovered: true,
+            ..
+        } => (
+            Color::from_rgba(78.0 / 255.0, 78.0 / 255.0, 78.0 / 255.0, 0.88),
+            Color::from_rgba(108.0 / 255.0, 108.0 / 255.0, 108.0 / 255.0, 0.60),
+        ),
+        _ => (
+            Color::from_rgba(92.0 / 255.0, 92.0 / 255.0, 92.0 / 255.0, 0.84),
+            Color::from_rgba(120.0 / 255.0, 120.0 / 255.0, 120.0 / 255.0, 0.56),
+        ),
+    };
 
-    let rail = scrollable::Rail {
-        background: Some(Background::Color(Color::from_rgba(0.18, 0.18, 0.19, 0.66))),
+    let vertical_rail = scrollable::Rail {
+        background: Some(Background::Color(Color::from_rgba(0.08, 0.08, 0.08, 0.38))),
         border: Border {
-            color: Color::from_rgba(0.36, 0.36, 0.40, 0.40),
+            color: Color::from_rgba(40.0 / 255.0, 40.0 / 255.0, 40.0 / 255.0, 0.42),
             width: 1.0,
             radius: 10.0.into(),
         },
         scroller: scrollable::Scroller {
-            background: Background::Color(Color::from_rgba(0.52, 0.54, 0.59, 0.90)),
+            background: Background::Color(scroller_background),
             border: Border {
-                color: Color::from_rgba(0.65, 0.67, 0.73, 0.55),
+                color: scroller_border,
                 width: 1.0,
                 radius: 10.0.into(),
             },
         },
     };
 
+    let horizontal_rail = scrollable::Rail {
+        background: None,
+        border: Border::default(),
+        scroller: scrollable::Scroller {
+            background: Background::Color(Color::TRANSPARENT),
+            border: Border::default(),
+        },
+    };
+
     style.container = container::Style::default();
-    style.vertical_rail = rail;
-    style.horizontal_rail = rail;
+    style.vertical_rail = vertical_rail;
+    style.horizontal_rail = horizontal_rail;
     style.gap = None;
     style
 }

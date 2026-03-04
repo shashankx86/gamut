@@ -14,7 +14,7 @@ impl Launcher {
         match Command::new(&app.command).args(&app.args).spawn() {
             Ok(_) => self.hide_launcher(),
             Err(error) => {
-                self.status = Some(format!("Failed to launch {}: {error}", app.name));
+                eprintln!("Failed to launch {}: {error}", app.name);
                 Task::none()
             }
         }
@@ -29,8 +29,11 @@ impl Launcher {
 
         self.query.clear();
         self.window_id = Some(id);
-        self.had_focus = false;
         self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
+        self.results_progress = 0.0;
+        self.results_target = 0.0;
+        self.selected_rank = 0;
+        self.scroll_start_rank = 0;
 
         Task::done(Message::NewLayerShell {
             settings: launcher_surface_settings(),

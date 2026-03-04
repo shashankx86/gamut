@@ -5,6 +5,6 @@ edition = "2024"
 
 [dependencies]
 freedesktop-desktop-entry = "0.8.1"
-iced = { version = "0.14.0", features = ["tokio"] }
+iced = { version = "0.14.0", features = ["tokio", "image", "svg"] }
 iced_layershell = "0.15.0"
 libc = "0.2"
