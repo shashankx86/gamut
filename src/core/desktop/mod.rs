@@ -31,56 +31,39 @@ impl DesktopApp {
 
 pub fn load_apps() -> Vec<DesktopApp> {
     let locales = get_languages_from_env();
-    let mut dedupe = HashSet::new();
+    let mut seen = HashSet::new();
     let mut apps = Vec::new();
 
     for entry in Iter::new(default_paths()).entries(Some(&locales)) {
-        if entry.hidden() || entry.no_display() {
+        if !is_launchable_entry(&entry) {
             continue;
         }
 
-        if let Some(kind) = entry.type_()
-            && kind != "Application"
-        {
+        let Some(app) = parse_desktop_app(&entry, &locales) else {
+            continue;
+        };
+
+        if !seen.insert(dedupe_key(&app)) {
             continue;
         }
 
-        let Some(name) = entry.name(&locales).map(|value| value.to_string()) else {
-            continue;
-        };
-
-        let Some(exec_line) = entry.exec().map(|value| value.to_string()) else {
-            continue;
-        };
-
-        let Some((command, args)) = parse_exec_command(&entry) else {
-            continue;
-        };
-
-        let dedupe_key = format!("{name}\0{command}\0{}", args.join("\0"));
-        if !dedupe.insert(dedupe_key) {
-            continue;
-        }
-
-        apps.push(DesktopApp::new(name, exec_line, command, args));
+        apps.push(app);
     }
 
-    apps.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+    apps.sort_by_cached_key(|app| app.name.to_lowercase());
     apps
 }
 
 pub fn trim_label(value: &str, max_len: usize) -> String {
+    if max_len == 0 {
+        return String::new();
+    }
+
     if value.chars().count() <= max_len {
         return value.to_string();
     }
 
-    let mut output = String::new();
-    for (index, character) in value.chars().enumerate() {
-        if index >= max_len.saturating_sub(1) {
-            break;
-        }
-        output.push(character);
-    }
+    let mut output: String = value.chars().take(max_len.saturating_sub(1)).collect();
     output.push('~');
     output
 }
@@ -89,6 +72,25 @@ fn parse_exec_command(entry: &DesktopEntry) -> Option<(String, Vec<String>)> {
     let parsed = entry.parse_exec().ok()?;
     let (command, args) = parsed.split_first()?;
     Some((command.to_string(), args.to_vec()))
+}
+
+fn is_launchable_entry(entry: &DesktopEntry) -> bool {
+    if entry.hidden() || entry.no_display() {
+        return false;
+    }
+
+    !matches!(entry.type_(), Some(kind) if kind != "Application")
+}
+
+fn parse_desktop_app(entry: &DesktopEntry, locales: &[String]) -> Option<DesktopApp> {
+    let name = entry.name(locales).map(|value| value.to_string())?;
+    let exec_line = entry.exec().map(|value| value.to_string())?;
+    let (command, args) = parse_exec_command(entry)?;
+    Some(DesktopApp::new(name, exec_line, command, args))
+}
+
+fn dedupe_key(app: &DesktopApp) -> String {
+    format!("{}\0{}\0{}", app.name, app.command, app.args.join("\0"))
 }
 
 #[cfg(test)]
@@ -117,5 +119,10 @@ mod tests {
     #[test]
     fn trim_label_truncates_and_appends_tilde() {
         assert_eq!(trim_label("abcdef", 4), "abc~");
+    }
+
+    #[test]
+    fn trim_label_zero_limit_returns_empty() {
+        assert_eq!(trim_label("abcdef", 0), "");
     }
 }

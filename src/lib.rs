@@ -1,7 +1,4 @@
-mod app;
-mod cli;
-mod desktop;
-mod ipc;
-mod runtime;
+mod core;
+mod ui;
 
-pub use runtime::run;
+pub use core::runtime::run;

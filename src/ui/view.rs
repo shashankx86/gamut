@@ -4,7 +4,7 @@ use super::styles::{
     app_icon_style, backdrop_style, footer_key_chip, footer_style, header_style, panel_style,
     result_button_style, results_scroll_style, search_input_style,
 };
-use crate::desktop::trim_label;
+use crate::core::desktop::trim_label;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Color, Element, Length, window};
 
