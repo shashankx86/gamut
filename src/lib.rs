@@ -1,5 +1,6 @@
 mod app;
 mod cli;
+mod desktop;
 mod ipc;
 mod runtime;
 
