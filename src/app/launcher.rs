@@ -45,7 +45,9 @@ impl Launcher {
                 let (_tx, receiver) = mpsc::channel();
                 (
                     receiver,
-                    Some(format!("IPC listener unavailable: {error}. daemon mode unavailable.")),
+                    Some(format!(
+                        "IPC listener unavailable: {error}. daemon mode unavailable."
+                    )),
                 )
             }
         };

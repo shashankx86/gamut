@@ -1,6 +1,4 @@
-use freedesktop_desktop_entry::{
-    DesktopEntry, Iter, default_paths, get_languages_from_env,
-};
+use freedesktop_desktop_entry::{DesktopEntry, Iter, default_paths, get_languages_from_env};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -14,11 +12,7 @@ pub struct DesktopApp {
 
 impl DesktopApp {
     pub fn new(name: String, exec_line: String, command: String, args: Vec<String>) -> Self {
-        let search_blob = format!(
-            "{}\n{}",
-            name.to_lowercase(),
-            exec_line.to_lowercase()
-        );
+        let search_blob = format!("{}\n{}", name.to_lowercase(), exec_line.to_lowercase());
 
         Self {
             name,

@@ -65,18 +65,22 @@ pub(super) fn app_icon_style() -> container::Style {
 }
 
 pub(super) fn footer_key_chip(label: &'static str) -> Element<'static, Message> {
-    container(text(label).size(11).color(Color::from_rgb(0.84, 0.86, 0.89)))
-        .padding([2, 6])
-        .style(|_| container::Style {
-            background: Some(Background::Color(Color::from_rgb(0.23, 0.24, 0.27))),
-            border: Border {
-                color: Color::from_rgba(0.55, 0.57, 0.62, 0.65),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..container::Style::default()
-        })
-        .into()
+    container(
+        text(label)
+            .size(11)
+            .color(Color::from_rgb(0.84, 0.86, 0.89)),
+    )
+    .padding([2, 6])
+    .style(|_| container::Style {
+        background: Some(Background::Color(Color::from_rgb(0.23, 0.24, 0.27))),
+        border: Border {
+            color: Color::from_rgba(0.55, 0.57, 0.62, 0.65),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..container::Style::default()
+    })
+    .into()
 }
 
 pub(super) fn search_input_style(_theme: &Theme, status: text_input::Status) -> text_input::Style {

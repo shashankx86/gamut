@@ -162,9 +162,6 @@ mod tests {
     #[test]
     fn falls_back_to_tmp_socket_path() {
         let path = socket_path_for(None, 1002, false);
-        assert_eq!(
-            path,
-            PathBuf::from(format!("/tmp/{SOCKET_NAME}.1002"))
-        );
+        assert_eq!(path, PathBuf::from(format!("/tmp/{SOCKET_NAME}.1002")));
     }
 }

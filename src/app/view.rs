@@ -97,15 +97,13 @@ impl Launcher {
             .to_string();
 
         let left = row![
-            container(
-                text(icon)
-                    .size(12)
-                    .color(Color::from_rgb(0.88, 0.90, 0.94)),
-            )
-            .padding([3, 8])
-            .style(|_| app_icon_style()),
+            container(text(icon).size(12).color(Color::from_rgb(0.88, 0.90, 0.94)),)
+                .padding([3, 8])
+                .style(|_| app_icon_style()),
             column![
-                text(&app.name).size(14).color(Color::from_rgb(0.92, 0.93, 0.95)),
+                text(&app.name)
+                    .size(14)
+                    .color(Color::from_rgb(0.92, 0.93, 0.95)),
                 text(trim_label(&app.exec_line, 56))
                     .size(12)
                     .color(Color::from_rgb(0.55, 0.58, 0.61)),
@@ -134,7 +132,11 @@ impl Launcher {
     }
 
     fn view_footer_bar(&self) -> Element<'_, Message> {
-        let status_text = self.status.as_deref().unwrap_or("Open Application").to_string();
+        let status_text = self
+            .status
+            .as_deref()
+            .unwrap_or("Open Application")
+            .to_string();
 
         let actions = row![
             text(status_text)

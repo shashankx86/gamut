@@ -11,7 +11,11 @@ pub fn parse_mode<I>(args: I) -> CliMode
 where
     I: IntoIterator<Item = OsString>,
 {
-    match args.into_iter().next().and_then(|arg| arg.into_string().ok()) {
+    match args
+        .into_iter()
+        .next()
+        .and_then(|arg| arg.into_string().ok())
+    {
         Some(flag) if flag == "--daemon" => CliMode::Daemon,
         Some(flag) if flag == "--quit" => CliMode::Quit,
         Some(flag) if flag == "--toggle" => CliMode::Toggle,
