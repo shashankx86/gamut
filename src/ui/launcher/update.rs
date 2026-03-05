@@ -12,16 +12,11 @@ impl Launcher {
         match message {
             Message::Tick => self.on_tick(),
             Message::AppsLoaded(apps) => {
-                self.apps = apps;
-                self.selected_rank = 0;
-                self.scroll_start_rank = 0;
+                self.set_apps(apps);
                 Task::none()
             }
             Message::QueryChanged(query) => {
-                self.query = query;
-                self.sync_results_target_with_query();
-                self.selected_rank = 0;
-                self.scroll_start_rank = 0;
+                self.update_query(query);
                 self.scroll_to_selected(true)
             }
             Message::LaunchFirstMatch => {
@@ -36,6 +31,10 @@ impl Launcher {
             Message::WindowClosed(id) => self.on_window_closed(id),
             Message::KeyboardEvent(id, key_event) => self.handle_key_event(id, key_event),
             Message::WindowEvent(id, window_event) => self.handle_window_event(id, window_event),
+            Message::FatalError(error) => {
+                eprintln!("{error}");
+                iced::exit()
+            }
             _ => Task::none(),
         }
     }
@@ -46,22 +45,26 @@ impl Launcher {
     }
 
     fn handle_ipc(&mut self) -> Task<Message> {
-        let mut latest_command = None;
+        let mut tasks = Vec::new();
 
         while let Ok(command) = self.ipc_receiver.try_recv() {
-            latest_command = Some(command);
+            match command {
+                IpcCommand::Toggle => {
+                    if self.window_id.is_some() {
+                        tasks.push(self.hide_launcher());
+                    } else {
+                        tasks.push(self.show_launcher());
+                    }
+                }
+                IpcCommand::Quit => return iced::exit(),
+                IpcCommand::Ping => {}
+            }
         }
 
-        match latest_command {
-            Some(IpcCommand::Toggle) => {
-                if self.window_id.is_some() {
-                    self.hide_launcher()
-                } else {
-                    self.show_launcher()
-                }
-            }
-            Some(IpcCommand::Quit) => iced::exit(),
-            Some(IpcCommand::Ping) | None => Task::none(),
+        if tasks.is_empty() {
+            Task::none()
+        } else {
+            Task::batch(tasks)
         }
     }
 

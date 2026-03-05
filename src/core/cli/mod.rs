@@ -11,16 +11,14 @@ pub fn parse_mode<I>(args: I) -> CliMode
 where
     I: IntoIterator<Item = OsString>,
 {
-    match args
-        .into_iter()
-        .next()
-        .and_then(|arg| arg.into_string().ok())
-    {
-        Some(flag) if flag == "--daemon" => CliMode::Daemon,
-        Some(flag) if flag == "--quit" => CliMode::Quit,
-        Some(flag) if flag == "--toggle" => CliMode::Toggle,
-        _ => CliMode::Toggle,
-    }
+    args.into_iter()
+        .filter_map(|arg| arg.into_string().ok())
+        .fold(CliMode::Toggle, |mode, flag| match flag.as_str() {
+            "--daemon" => CliMode::Daemon,
+            "--quit" => CliMode::Quit,
+            "--toggle" => CliMode::Toggle,
+            _ => mode,
+        })
 }
 
 #[cfg(test)]
@@ -34,14 +32,30 @@ mod tests {
     }
 
     #[test]
-    fn parses_known_flags() {
-        assert_eq!(parse_mode([OsString::from("--daemon")]), CliMode::Daemon);
-        assert_eq!(parse_mode([OsString::from("--quit")]), CliMode::Quit);
-        assert_eq!(parse_mode([OsString::from("--toggle")]), CliMode::Toggle);
+    fn parses_known_flags_in_any_position() {
+        assert_eq!(
+            parse_mode([OsString::from("--what"), OsString::from("--daemon")]),
+            CliMode::Daemon,
+        );
+        assert_eq!(
+            parse_mode([OsString::from("value"), OsString::from("--quit")]),
+            CliMode::Quit,
+        );
+        assert_eq!(
+            parse_mode([OsString::from("value"), OsString::from("--toggle")]),
+            CliMode::Toggle,
+        );
     }
 
     #[test]
-    fn unknown_flag_falls_back_to_toggle() {
-        assert_eq!(parse_mode([OsString::from("--what")]), CliMode::Toggle);
+    fn last_known_flag_wins_when_multiple_are_provided() {
+        assert_eq!(
+            parse_mode([
+                OsString::from("--daemon"),
+                OsString::from("--quit"),
+                OsString::from("--toggle"),
+            ]),
+            CliMode::Toggle,
+        );
     }
 }

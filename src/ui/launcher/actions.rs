@@ -27,13 +27,9 @@ impl Launcher {
 
         let id = window::Id::unique();
 
-        self.query.clear();
+        self.clear_window_state();
         self.window_id = Some(id);
         self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
-        self.results_progress = 0.0;
-        self.results_target = 0.0;
-        self.selected_rank = 0;
-        self.scroll_start_rank = 0;
 
         Task::done(Message::NewLayerShell {
             settings: launcher_surface_settings(),

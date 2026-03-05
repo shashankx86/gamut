@@ -3,7 +3,7 @@ use crate::core::ipc::{self, IpcCommand};
 use crate::ui;
 use std::env;
 use std::error::Error;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
@@ -37,27 +37,42 @@ fn ensure_daemon_and_send(command: IpcCommand) -> Result<(), DynError> {
         return Ok(());
     }
 
-    spawn_daemon_process()?;
-    wait_for_daemon(command)
+    let mut daemon_child = spawn_daemon_process()?;
+    wait_for_daemon(command, &mut daemon_child)
 }
 
-fn spawn_daemon_process() -> Result<(), DynError> {
-    Command::new(env::current_exe()?)
+fn spawn_daemon_process() -> Result<Child, DynError> {
+    let child = Command::new(env::current_exe()?)
         .arg("--daemon")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()?;
-    Ok(())
+
+    Ok(child)
 }
 
-fn wait_for_daemon(command: IpcCommand) -> Result<(), DynError> {
+fn wait_for_daemon(command: IpcCommand, daemon_child: &mut Child) -> Result<(), DynError> {
+    let mut last_error: Option<String> = None;
+
     for _ in 0..DAEMON_START_RETRIES {
         thread::sleep(DAEMON_START_DELAY);
-        if ipc::send_command(command).is_ok() {
-            return Ok(());
+
+        match ipc::send_command(command) {
+            Ok(()) => return Ok(()),
+            Err(error) => last_error = Some(error.to_string()),
+        }
+
+        if let Some(status) = daemon_child.try_wait()? {
+            return Err(
+                format!("gamut daemon exited before becoming ready (status: {status})").into(),
+            );
         }
     }
 
-    Err("could not contact gamut daemon".into())
+    let detail = last_error.unwrap_or_else(|| "no socket response".to_string());
+    Err(
+        format!("could not contact gamut daemon after {DAEMON_START_RETRIES} attempts: {detail}")
+            .into(),
+    )
 }

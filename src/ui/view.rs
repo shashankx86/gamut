@@ -69,7 +69,7 @@ impl Launcher {
                 .padding([8, 0]),
             );
         } else {
-            for (rank, index) in filtered.into_iter().enumerate() {
+            for (rank, index) in filtered.iter().copied().enumerate() {
                 results = results.push(self.view_result_row(index, rank == self.selected_rank));
             }
         }
