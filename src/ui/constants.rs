@@ -1,4 +1,4 @@
-pub(super) const SHOWN_HEIGHT: u32 = 760;
+pub(super) const SHOWN_HEIGHT: u32 = 103;
 pub(super) const HIDDEN_HEIGHT: u32 = 1;
 pub(super) const UNFOCUS_GUARD_MS: u64 = 250;
 pub(super) const MAX_RESULTS: usize = 200;

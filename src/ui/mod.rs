@@ -53,9 +53,9 @@ fn launcher_hidden_surface_settings() -> NewLayerShellSettings {
 
 fn launcher_surface_settings_for(height: u32, top_margin: i32) -> NewLayerShellSettings {
     NewLayerShellSettings {
-        size: Some((0, height)),
+        size: Some((constants::PANEL_WIDTH as u32, height)),
         layer: Layer::Overlay,
-        anchor: Anchor::Top | Anchor::Left | Anchor::Right,
+        anchor: Anchor::Top,
         exclusive_zone: None,
         margin: Some((top_margin, 0, 0, 0)),
         keyboard_interactivity: KeyboardInteractivity::Exclusive,

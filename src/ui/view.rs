@@ -55,8 +55,8 @@ impl Launcher {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding([8, 24])
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
+            .align_x(iced::alignment::Horizontal::Center)
+            .align_y(iced::alignment::Vertical::Top)
             .style(|_| backdrop_style())
             .into()
     }

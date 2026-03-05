@@ -48,8 +48,7 @@ impl Launcher {
     }
 
     fn on_tick(&mut self) -> Task<Message> {
-        self.animate_results();
-        Task::none()
+        self.animate_results()
     }
 
     fn handle_ipc_command(&mut self, command: IpcCommand) -> Task<Message> {

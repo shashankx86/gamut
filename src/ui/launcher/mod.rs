@@ -204,15 +204,41 @@ impl Launcher {
         };
     }
 
-    pub(super) fn animate_results(&mut self) {
+    pub(super) fn animate_results(&mut self) -> Task<Message> {
         let delta = self.results_target - self.results_progress;
-        if delta.abs() < 0.01 {
-            self.results_progress = self.results_target;
-            return;
+        let mut task = Task::none();
+        
+        // Expand the layer shell window immediately when starting to show results,
+        // so the UI animation can play fluidly inside the larger compositor bounds.
+        if self.results_progress == 0.0 && self.results_target > 0.0 {
+            if let Some(id) = self.window_id {
+                let max_h = 103.0 + crate::ui::constants::RESULTS_HEIGHT;
+                task = Task::done(Message::SizeChange {
+                    id,
+                    size: (crate::ui::constants::PANEL_WIDTH as u32, max_h as u32),
+                });
+            }
         }
 
-        self.results_progress =
-            (self.results_progress + delta * RESULTS_ANIMATION_SPEED).clamp(0.0, 1.0);
+        let needs_snap = delta.abs() < 0.01;
+        if needs_snap {
+            self.results_progress = self.results_target;
+            
+            // Shrink the layer shell window after the collapse animation fully completes,
+            // restoring the ability to click through the transparent area below.
+            if self.results_progress == 0.0 {
+                if let Some(id) = self.window_id {
+                    task = Task::done(Message::SizeChange {
+                        id,
+                        size: (crate::ui::constants::PANEL_WIDTH as u32, 103),
+                    });
+                }
+            }
+        } else {
+            self.results_progress = (self.results_progress + delta * RESULTS_ANIMATION_SPEED).clamp(0.0, 1.0);
+        }
+            
+        task
     }
 
     pub(super) fn selected_result_index(&self) -> Option<usize> {
