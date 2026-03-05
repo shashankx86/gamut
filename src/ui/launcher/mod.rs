@@ -3,12 +3,42 @@ mod subscription;
 mod update;
 
 use super::constants::{MAX_RESULTS, RESULTS_ANIMATION_SPEED};
-use crate::core::desktop::{DesktopApp, load_apps, normalize_query};
+use super::launcher_hidden_surface_settings;
+use crate::core::desktop::{
+    DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
+};
 use crate::core::ipc::{IpcCommand, start_listener};
 use iced::widget;
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
+
+const ICON_RESOLVE_BATCH_SIZE: usize = 24;
+const IPC_SUBSCRIPTION_ID: u64 = 1;
+
+#[derive(Clone)]
+pub(super) struct IpcReceiverHandle {
+    id: u64,
+    receiver: Arc<Mutex<Receiver<IpcCommand>>>,
+}
+
+impl IpcReceiverHandle {
+    fn new(receiver: Receiver<IpcCommand>) -> Self {
+        Self {
+            id: IPC_SUBSCRIPTION_ID,
+            receiver: Arc::new(Mutex::new(receiver)),
+        }
+    }
+}
+
+impl Hash for IpcReceiverHandle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
 
 pub(super) struct Launcher {
     pub(super) apps: Vec<DesktopApp>,
@@ -17,13 +47,15 @@ pub(super) struct Launcher {
     pub(super) input_id: widget::Id,
     pub(super) results_scroll_id: widget::Id,
     pub(super) window_id: Option<window::Id>,
+    pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
     pub(super) scroll_start_rank: usize,
     filtered_indices: Vec<usize>,
     results_progress: f32,
     results_target: f32,
-    ipc_receiver: Receiver<IpcCommand>,
+    icon_resolve_in_flight: bool,
+    ipc_handle: IpcReceiverHandle,
 }
 
 #[to_layer_message(multi)]
@@ -31,9 +63,11 @@ pub(super) struct Launcher {
 pub(super) enum Message {
     Tick,
     AppsLoaded(Vec<DesktopApp>),
+    IconsResolved(Vec<(usize, Option<PathBuf>)>),
     QueryChanged(String),
     LaunchFirstMatch,
     LaunchIndex(usize),
+    IpcCommand(IpcCommand),
     KeyboardEvent(window::Id, iced::keyboard::Event),
     WindowEvent(window::Id, window::Event),
     WindowOpened(window::Id),
@@ -45,16 +79,23 @@ impl Launcher {
     pub(super) fn new() -> (Self, Task<Message>) {
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
+        let hidden_window_id = window::Id::unique();
 
-        let (ipc_receiver, startup_task) = match start_listener() {
+        let (ipc_handle, startup_task) = match start_listener() {
             Ok(receiver) => (
-                receiver,
-                Task::perform(async { load_apps() }, Message::AppsLoaded),
+                IpcReceiverHandle::new(receiver),
+                Task::batch(vec![
+                    Task::done(Message::NewLayerShell {
+                        settings: launcher_hidden_surface_settings(),
+                        id: hidden_window_id,
+                    }),
+                    Task::perform(async { load_apps() }, Message::AppsLoaded),
+                ]),
             ),
             Err(error) => {
                 let (_tx, receiver) = mpsc::channel();
                 (
-                    receiver,
+                    IpcReceiverHandle::new(receiver),
                     Task::done(Message::FatalError(format!(
                         "IPC listener unavailable: {error}. daemon mode unavailable."
                     ))),
@@ -69,14 +110,16 @@ impl Launcher {
                 normalized_query: String::new(),
                 input_id,
                 results_scroll_id,
-                window_id: None,
+                window_id: Some(hidden_window_id),
+                is_visible: false,
                 ignore_unfocus_until: None,
                 selected_rank: 0,
                 scroll_start_rank: 0,
                 filtered_indices: Vec::new(),
                 results_progress: 0.0,
                 results_target: 0.0,
-                ipc_receiver,
+                icon_resolve_in_flight: false,
+                ipc_handle,
             },
             startup_task,
         )
@@ -118,6 +161,7 @@ impl Launcher {
         self.scroll_start_rank = 0;
         self.results_progress = 0.0;
         self.results_target = 0.0;
+        self.icon_resolve_in_flight = false;
     }
 
     pub(super) fn results_progress(&self) -> f32 {
@@ -184,6 +228,52 @@ impl Launcher {
     }
 
     pub(super) fn needs_fast_tick(&self) -> bool {
-        self.window_id.is_some() || (self.results_target - self.results_progress).abs() > 0.01
+        self.is_visible && (self.results_target - self.results_progress).abs() > 0.01
+    }
+
+    pub(super) fn request_icon_resolution_for_visible(&mut self) -> Task<Message> {
+        if !self.is_visible || self.icon_resolve_in_flight {
+            return Task::none();
+        }
+
+        let requests: Vec<IconResolveRequest> = self
+            .filtered_indices
+            .iter()
+            .copied()
+            .filter_map(|index| {
+                self.apps
+                    .get(index)
+                    .filter(|app| app.icon_path.is_none())
+                    .map(|app| app.icon_request(index))
+            })
+            .take(ICON_RESOLVE_BATCH_SIZE)
+            .collect();
+
+        if requests.is_empty() {
+            return Task::none();
+        }
+
+        self.icon_resolve_in_flight = true;
+        Task::perform(
+            async move { resolve_icon_requests(requests) },
+            Message::IconsResolved,
+        )
+    }
+
+    pub(super) fn apply_resolved_icons(&mut self, updates: Vec<(usize, Option<PathBuf>)>) {
+        for (index, icon_path) in updates {
+            if let Some(path) = icon_path
+                && let Some(app) = self.apps.get_mut(index)
+                && app.icon_path.is_none()
+            {
+                app.icon_path = Some(path);
+            }
+        }
+
+        self.icon_resolve_in_flight = false;
+    }
+
+    pub(super) fn ipc_handle(&self) -> IpcReceiverHandle {
+        self.ipc_handle.clone()
     }
 }

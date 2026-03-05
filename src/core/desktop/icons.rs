@@ -1,4 +1,4 @@
-use freedesktop_desktop_entry::DesktopEntry;
+use super::model::IconResolveRequest;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
@@ -6,7 +6,23 @@ use std::path::{Path, PathBuf};
 
 const GENERIC_ICON_CACHE_KEY: &str = "__generic_app_icon__";
 
-pub(super) fn resolve_icon_path(
+pub(super) fn resolve_app_icon(
+    request: &IconResolveRequest,
+    icon_cache: &mut HashMap<String, Option<PathBuf>>,
+) -> Option<PathBuf> {
+    resolve_icon_path(request.icon_name.as_deref(), icon_cache)
+        .or_else(|| {
+            resolve_context_icon_path(
+                &request.icon_categories,
+                &request.name,
+                &request.exec_line,
+                icon_cache,
+            )
+        })
+        .or_else(|| resolve_generic_icon_path(icon_cache))
+}
+
+fn resolve_icon_path(
     icon: Option<&str>,
     icon_cache: &mut HashMap<String, Option<PathBuf>>,
 ) -> Option<PathBuf> {
@@ -24,9 +40,7 @@ pub(super) fn resolve_icon_path(
     resolved
 }
 
-pub(super) fn resolve_generic_icon_path(
-    icon_cache: &mut HashMap<String, Option<PathBuf>>,
-) -> Option<PathBuf> {
+fn resolve_generic_icon_path(icon_cache: &mut HashMap<String, Option<PathBuf>>) -> Option<PathBuf> {
     if let Some(cached) = icon_cache.get(GENERIC_ICON_CACHE_KEY) {
         return cached.clone();
     }
@@ -45,23 +59,26 @@ pub(super) fn resolve_generic_icon_path(
     resolved
 }
 
-pub(super) fn resolve_context_icon_path(
-    entry: &DesktopEntry,
+fn resolve_context_icon_path(
+    categories: &[String],
     name: &str,
     exec_line: &str,
     icon_cache: &mut HashMap<String, Option<PathBuf>>,
 ) -> Option<PathBuf> {
-    let fallback_names = context_icon_candidates(entry, name, exec_line);
+    let fallback_names = context_icon_candidates(categories, name, exec_line);
 
     fallback_names
         .into_iter()
         .find_map(|icon_name| resolve_named_icon(icon_name, icon_cache))
 }
 
-fn context_icon_candidates(entry: &DesktopEntry, name: &str, exec_line: &str) -> Vec<&'static str> {
+fn context_icon_candidates(
+    categories: &[String],
+    name: &str,
+    exec_line: &str,
+) -> Vec<&'static str> {
     let mut names = Vec::new();
 
-    let categories = entry.categories().unwrap_or_default();
     let has_category = |wanted: &str| {
         categories
             .iter()

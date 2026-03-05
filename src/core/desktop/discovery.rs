@@ -1,5 +1,5 @@
-use super::icons::{resolve_context_icon_path, resolve_generic_icon_path, resolve_icon_path};
-use super::model::DesktopApp;
+use super::icons::resolve_app_icon;
+use super::model::{DesktopApp, IconResolveRequest};
 use freedesktop_desktop_entry::{DesktopEntry, Iter, default_paths, get_languages_from_env};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -7,7 +7,6 @@ use std::path::PathBuf;
 pub fn load_apps() -> Vec<DesktopApp> {
     let locales = get_languages_from_env();
     let mut seen = HashSet::new();
-    let mut icon_cache: HashMap<String, Option<PathBuf>> = HashMap::new();
     let mut apps = Vec::new();
 
     for entry in Iter::new(default_paths()).entries(Some(&locales)) {
@@ -15,7 +14,7 @@ pub fn load_apps() -> Vec<DesktopApp> {
             continue;
         }
 
-        let Some(app) = parse_desktop_app(&entry, &locales, &mut icon_cache) else {
+        let Some(app) = parse_desktop_app(&entry, &locales) else {
             continue;
         };
 
@@ -28,6 +27,18 @@ pub fn load_apps() -> Vec<DesktopApp> {
 
     apps.sort_by_cached_key(|app| app.name.to_lowercase());
     apps
+}
+
+pub fn resolve_icon_requests(requests: Vec<IconResolveRequest>) -> Vec<(usize, Option<PathBuf>)> {
+    let mut icon_cache: HashMap<String, Option<PathBuf>> = HashMap::new();
+
+    requests
+        .into_iter()
+        .map(|request| {
+            let icon_path = resolve_app_icon(&request, &mut icon_cache);
+            (request.index, icon_path)
+        })
+        .collect()
 }
 
 fn parse_exec_command(entry: &DesktopEntry) -> Option<(String, Vec<String>)> {
@@ -44,20 +55,35 @@ fn is_launchable_entry(entry: &DesktopEntry) -> bool {
     !matches!(entry.type_(), Some(kind) if kind != "Application")
 }
 
-fn parse_desktop_app(
-    entry: &DesktopEntry,
-    locales: &[String],
-    icon_cache: &mut HashMap<String, Option<PathBuf>>,
-) -> Option<DesktopApp> {
+fn parse_desktop_app(entry: &DesktopEntry, locales: &[String]) -> Option<DesktopApp> {
     let name = entry.name(locales).map(|value| value.to_string())?;
     let exec_line = entry.exec().map(|value| value.to_string())?;
     let (command, args) = parse_exec_command(entry)?;
 
-    let icon_path = resolve_icon_path(entry.icon(), icon_cache)
-        .or_else(|| resolve_context_icon_path(entry, &name, &exec_line, icon_cache))
-        .or_else(|| resolve_generic_icon_path(icon_cache));
+    let icon_name = entry.icon().map(str::trim).and_then(|value| {
+        if value.is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    });
 
-    Some(DesktopApp::new(name, exec_line, command, args, icon_path))
+    let icon_categories = entry
+        .categories()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|category| category.to_string())
+        .collect();
+
+    Some(DesktopApp::new(
+        name,
+        exec_line,
+        command,
+        args,
+        icon_name,
+        icon_categories,
+        None,
+    ))
 }
 
 fn dedupe_key(app: &DesktopApp) -> String {

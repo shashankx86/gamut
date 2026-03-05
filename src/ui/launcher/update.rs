@@ -13,11 +13,18 @@ impl Launcher {
             Message::Tick => self.on_tick(),
             Message::AppsLoaded(apps) => {
                 self.set_apps(apps);
-                Task::none()
+                self.request_icon_resolution_for_visible()
+            }
+            Message::IconsResolved(updates) => {
+                self.apply_resolved_icons(updates);
+                self.request_icon_resolution_for_visible()
             }
             Message::QueryChanged(query) => {
                 self.update_query(query);
-                self.scroll_to_selected(true)
+                Task::batch(vec![
+                    self.scroll_to_selected(true),
+                    self.request_icon_resolution_for_visible(),
+                ])
             }
             Message::LaunchFirstMatch => {
                 if let Some(index) = self.selected_result_index() {
@@ -27,6 +34,7 @@ impl Launcher {
                 }
             }
             Message::LaunchIndex(index) => self.launch(index),
+            Message::IpcCommand(command) => self.handle_ipc_command(command),
             Message::WindowOpened(id) => self.on_window_opened(id),
             Message::WindowClosed(id) => self.on_window_closed(id),
             Message::KeyboardEvent(id, key_event) => self.handle_key_event(id, key_event),
@@ -41,35 +49,25 @@ impl Launcher {
 
     fn on_tick(&mut self) -> Task<Message> {
         self.animate_results();
-        self.handle_ipc()
+        Task::none()
     }
 
-    fn handle_ipc(&mut self) -> Task<Message> {
-        let mut tasks = Vec::new();
-
-        while let Ok(command) = self.ipc_receiver.try_recv() {
-            match command {
-                IpcCommand::Toggle => {
-                    if self.window_id.is_some() {
-                        tasks.push(self.hide_launcher());
-                    } else {
-                        tasks.push(self.show_launcher());
-                    }
+    fn handle_ipc_command(&mut self, command: IpcCommand) -> Task<Message> {
+        match command {
+            IpcCommand::Toggle => {
+                if self.is_visible {
+                    self.hide_launcher()
+                } else {
+                    self.show_launcher()
                 }
-                IpcCommand::Quit => return iced::exit(),
-                IpcCommand::Ping => {}
             }
-        }
-
-        if tasks.is_empty() {
-            Task::none()
-        } else {
-            Task::batch(tasks)
+            IpcCommand::Quit => iced::exit(),
+            IpcCommand::Ping => Task::none(),
         }
     }
 
     fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
-        if self.window_id != Some(id) {
+        if self.window_id != Some(id) || !self.is_visible {
             return Task::none();
         }
 
@@ -78,12 +76,14 @@ impl Launcher {
         Task::batch(vec![
             widget::operation::focus(self.input_id.clone()),
             widget::operation::move_cursor_to_end(self.input_id.clone()),
+            self.request_icon_resolution_for_visible(),
         ])
     }
 
     fn on_window_closed(&mut self, id: window::Id) -> Task<Message> {
         if self.window_id == Some(id) {
             self.window_id = None;
+            self.is_visible = false;
             self.clear_window_state();
         }
 
@@ -91,7 +91,7 @@ impl Launcher {
     }
 
     fn handle_key_event(&mut self, id: window::Id, event: keyboard::Event) -> Task<Message> {
-        if self.window_id != Some(id) {
+        if self.window_id != Some(id) || !self.is_visible {
             return Task::none();
         }
 
@@ -164,7 +164,7 @@ impl Launcher {
     }
 
     fn handle_window_event(&mut self, id: window::Id, event: window::Event) -> Task<Message> {
-        if self.window_id != Some(id) {
+        if self.window_id != Some(id) || !self.is_visible {
             return Task::none();
         }
 

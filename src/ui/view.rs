@@ -10,6 +10,14 @@ use iced::{Color, ContentFit, Element, Length, window};
 
 impl Launcher {
     pub(super) fn view(&self, _window: window::Id) -> Element<'_, Message> {
+        if !self.is_visible {
+            return container("")
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(|_| backdrop_style())
+                .into();
+        }
+
         let mut content = column![self.view_search_header()]
             .spacing(8)
             .width(Length::Fixed(PANEL_WIDTH))

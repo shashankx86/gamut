@@ -3,7 +3,7 @@ mod launcher;
 mod styles;
 mod view;
 
-use constants::{SHOWN_HEIGHT, SURFACE_TOP_MARGIN};
+use constants::{HIDDEN_HEIGHT, SHOWN_HEIGHT, SURFACE_TOP_MARGIN};
 use iced::Theme;
 use iced::window;
 use iced_layershell::daemon;
@@ -44,12 +44,20 @@ fn daemon_layer_settings() -> LayerShellSettings {
 }
 
 fn launcher_surface_settings() -> NewLayerShellSettings {
+    launcher_surface_settings_for(SHOWN_HEIGHT, SURFACE_TOP_MARGIN)
+}
+
+fn launcher_hidden_surface_settings() -> NewLayerShellSettings {
+    launcher_surface_settings_for(HIDDEN_HEIGHT, 0)
+}
+
+fn launcher_surface_settings_for(height: u32, top_margin: i32) -> NewLayerShellSettings {
     NewLayerShellSettings {
-        size: Some((0, SHOWN_HEIGHT)),
+        size: Some((0, height)),
         layer: Layer::Overlay,
         anchor: Anchor::Top | Anchor::Left | Anchor::Right,
         exclusive_zone: None,
-        margin: Some((SURFACE_TOP_MARGIN, 0, 0, 0)),
+        margin: Some((top_margin, 0, 0, 0)),
         keyboard_interactivity: KeyboardInteractivity::Exclusive,
         events_transparent: false,
         namespace: Some(namespace()),

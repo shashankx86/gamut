@@ -1,7 +1,8 @@
-use super::super::constants::UNFOCUS_GUARD_MS;
+use super::super::constants::{HIDDEN_HEIGHT, UNFOCUS_GUARD_MS};
 use super::super::launcher_surface_settings;
 use super::{Launcher, Message};
-use iced::{Task, window};
+use iced::{window, Task};
+use iced_layershell::reexport::Layer;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -21,31 +22,60 @@ impl Launcher {
     }
 
     pub(super) fn show_launcher(&mut self) -> Task<Message> {
-        if self.window_id.is_some() {
+        if self.is_visible {
             return Task::none();
         }
 
-        let id = window::Id::unique();
-
         self.clear_window_state();
-        self.window_id = Some(id);
+        self.is_visible = true;
         self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
 
-        Task::done(Message::NewLayerShell {
-            settings: launcher_surface_settings(),
-            id,
-        })
+        self.recreate_launcher_surface()
     }
 
     pub(super) fn hide_launcher(&mut self) -> Task<Message> {
-        let window_id = self.window_id.take();
+        if !self.is_visible {
+            return Task::none();
+        }
+
+        self.is_visible = false;
         self.clear_window_state();
 
-        if let Some(id) = window_id {
-            Task::done(Message::RemoveWindow(id))
+        if let Some(id) = self.window_id {
+            Task::batch(vec![
+                Task::done(Message::LayerChange {
+                    id,
+                    layer: Layer::Bottom,
+                }),
+                Task::done(Message::SizeChange {
+                    id,
+                    size: (0, HIDDEN_HEIGHT),
+                }),
+                Task::done(Message::MarginChange {
+                    id,
+                    margin: (0, 0, 0, 0),
+                }),
+            ])
         } else {
             Task::none()
         }
+    }
+
+    pub(super) fn recreate_launcher_surface(&mut self) -> Task<Message> {
+        let previous_window_id = self.window_id;
+        let new_window_id = window::Id::unique();
+        self.window_id = Some(new_window_id);
+
+        let mut tasks = Vec::new();
+        if let Some(id) = previous_window_id {
+            tasks.push(Task::done(Message::RemoveWindow(id)));
+        }
+        tasks.push(Task::done(Message::NewLayerShell {
+            settings: launcher_surface_settings(),
+            id: new_window_id,
+        }));
+
+        Task::batch(tasks)
     }
 
     pub(super) fn should_ignore_unfocus(&self) -> bool {

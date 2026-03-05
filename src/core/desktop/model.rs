@@ -6,8 +6,19 @@ pub struct DesktopApp {
     pub exec_line: String,
     pub command: String,
     pub args: Vec<String>,
+    pub icon_name: Option<String>,
+    pub icon_categories: Vec<String>,
     pub icon_path: Option<PathBuf>,
     search_blob: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct IconResolveRequest {
+    pub index: usize,
+    pub icon_name: Option<String>,
+    pub icon_categories: Vec<String>,
+    pub name: String,
+    pub exec_line: String,
 }
 
 impl DesktopApp {
@@ -16,6 +27,8 @@ impl DesktopApp {
         exec_line: String,
         command: String,
         args: Vec<String>,
+        icon_name: Option<String>,
+        icon_categories: Vec<String>,
         icon_path: Option<PathBuf>,
     ) -> Self {
         let search_blob = format!("{}\n{}", name.to_lowercase(), exec_line.to_lowercase());
@@ -25,6 +38,8 @@ impl DesktopApp {
             exec_line,
             command,
             args,
+            icon_name,
+            icon_categories,
             icon_path,
             search_blob,
         }
@@ -32,6 +47,16 @@ impl DesktopApp {
 
     pub fn matches_normalized_query(&self, normalized_query: &str) -> bool {
         normalized_query.is_empty() || self.search_blob.contains(normalized_query)
+    }
+
+    pub fn icon_request(&self, index: usize) -> IconResolveRequest {
+        IconResolveRequest {
+            index,
+            icon_name: self.icon_name.clone(),
+            icon_categories: self.icon_categories.clone(),
+            name: self.name.clone(),
+            exec_line: self.exec_line.clone(),
+        }
     }
 }
 
@@ -64,6 +89,8 @@ mod tests {
             "/usr/bin/firefox --new-window".to_string(),
             "/usr/bin/firefox".to_string(),
             vec!["--new-window".to_string()],
+            None,
+            Vec::new(),
             None,
         );
 
