@@ -1,8 +1,7 @@
-use super::super::constants::{HIDDEN_HEIGHT, UNFOCUS_GUARD_MS};
+use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::launcher_surface_settings;
 use super::{Launcher, Message};
-use iced::{window, Task};
-use iced_layershell::reexport::Layer;
+use iced::{Task, window};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -41,21 +40,8 @@ impl Launcher {
         self.is_visible = false;
         self.clear_window_state();
 
-        if let Some(id) = self.window_id {
-            Task::batch(vec![
-                Task::done(Message::LayerChange {
-                    id,
-                    layer: Layer::Bottom,
-                }),
-                Task::done(Message::SizeChange {
-                    id,
-                    size: (0, HIDDEN_HEIGHT),
-                }),
-                Task::done(Message::MarginChange {
-                    id,
-                    margin: (0, 0, 0, 0),
-                }),
-            ])
+        if let Some(id) = self.window_id.take() {
+            Task::done(Message::RemoveWindow(id))
         } else {
             Task::none()
         }

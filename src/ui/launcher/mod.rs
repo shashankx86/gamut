@@ -130,15 +130,33 @@ impl Launcher {
     }
 
     fn refresh_filtered_indices(&mut self) {
-        self.filtered_indices = self
+        let mut ranked_matches: Vec<(usize, i32)> = self
             .apps
             .iter()
             .enumerate()
             .filter_map(|(index, app)| {
-                app.matches_normalized_query(&self.normalized_query)
-                    .then_some(index)
+                app.query_match_score(&self.normalized_query)
+                    .map(|score| (index, score))
             })
+            .collect();
+
+        if !self.normalized_query.is_empty() {
+            ranked_matches.sort_by(|(left_index, left_score), (right_index, right_score)| {
+                right_score
+                    .cmp(left_score)
+                    .then_with(|| {
+                        self.apps[*left_index]
+                            .name
+                            .cmp(&self.apps[*right_index].name)
+                    })
+                    .then_with(|| left_index.cmp(right_index))
+            });
+        }
+
+        self.filtered_indices = ranked_matches
+            .into_iter()
             .take(MAX_RESULTS)
+            .map(|(index, _)| index)
             .collect();
 
         if self.filtered_indices.is_empty() {

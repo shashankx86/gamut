@@ -9,7 +9,9 @@ pub struct DesktopApp {
     pub icon_name: Option<String>,
     pub icon_categories: Vec<String>,
     pub icon_path: Option<PathBuf>,
-    search_blob: String,
+    normalized_name: String,
+    normalized_command: String,
+    normalized_exec_line: String,
 }
 
 #[derive(Debug, Clone)]
@@ -31,7 +33,13 @@ impl DesktopApp {
         icon_categories: Vec<String>,
         icon_path: Option<PathBuf>,
     ) -> Self {
-        let search_blob = format!("{}\n{}", name.to_lowercase(), exec_line.to_lowercase());
+        let normalized_name = name.to_lowercase();
+        let normalized_exec_line = exec_line.to_lowercase();
+        let normalized_command = command
+            .rsplit('/')
+            .next()
+            .unwrap_or(command.as_str())
+            .to_lowercase();
 
         Self {
             name,
@@ -41,12 +49,52 @@ impl DesktopApp {
             icon_name,
             icon_categories,
             icon_path,
-            search_blob,
+            normalized_name,
+            normalized_command,
+            normalized_exec_line,
         }
     }
 
-    pub fn matches_normalized_query(&self, normalized_query: &str) -> bool {
-        normalized_query.is_empty() || self.search_blob.contains(normalized_query)
+    pub fn query_match_score(&self, normalized_query: &str) -> Option<i32> {
+        if normalized_query.is_empty() {
+            return Some(0);
+        }
+
+        let mut best_score: Option<i32> = None;
+
+        let mut update_best = |candidate: i32| {
+            best_score = Some(best_score.map_or(candidate, |current| current.max(candidate)));
+        };
+
+        if self.normalized_name == normalized_query {
+            update_best(12_000);
+        }
+
+        if self.normalized_name.starts_with(normalized_query) {
+            update_best(10_000 - self.normalized_name.len() as i32);
+        }
+
+        for (index, _) in self.normalized_name.match_indices(normalized_query) {
+            if is_word_boundary(&self.normalized_name, index) {
+                update_best(9_000 - index as i32);
+            } else {
+                update_best(8_000 - index as i32);
+            }
+        }
+
+        if self.normalized_command.starts_with(normalized_query) {
+            update_best(6_000 - self.normalized_command.len() as i32);
+        }
+
+        if let Some(index) = self.normalized_command.find(normalized_query) {
+            update_best(5_000 - index as i32);
+        }
+
+        if let Some(index) = self.normalized_exec_line.find(normalized_query) {
+            update_best(1_000 - index as i32);
+        }
+
+        best_score
     }
 
     pub fn icon_request(&self, index: usize) -> IconResolveRequest {
@@ -62,6 +110,17 @@ impl DesktopApp {
 
 pub fn normalize_query(query: &str) -> String {
     query.trim().to_lowercase()
+}
+
+fn is_word_boundary(text: &str, index: usize) -> bool {
+    if index == 0 {
+        return true;
+    }
+
+    text[..index]
+        .chars()
+        .next_back()
+        .is_none_or(|ch| !ch.is_alphanumeric())
 }
 
 pub fn trim_label(value: &str, max_len: usize) -> String {
@@ -98,9 +157,65 @@ mod tests {
         let fire = normalize_query("fire");
         let spotify = normalize_query("spotify");
 
-        assert!(app.matches_normalized_query(&fire));
-        assert!(app.matches_normalized_query(&normalized));
-        assert!(!app.matches_normalized_query(&spotify));
+        assert!(app.query_match_score(&fire).is_some());
+        assert!(app.query_match_score(&normalized).is_some());
+        assert!(app.query_match_score(&spotify).is_none());
+    }
+
+    #[test]
+    fn name_prefix_beats_exec_path_match() {
+        let resolve = DesktopApp::new(
+            "DaVinci Resolve".to_string(),
+            "/opt/resolve/bin/resolve %u".to_string(),
+            "/opt/resolve/bin/resolve".to_string(),
+            vec!["%u".to_string()],
+            None,
+            Vec::new(),
+            None,
+        );
+        let raw_player = DesktopApp::new(
+            "Blackmagic RAW Player".to_string(),
+            "/opt/resolve/BlackmagicRAWPlayer/BlackmagicRAWPlayer %f".to_string(),
+            "/opt/resolve/BlackmagicRAWPlayer/BlackmagicRAWPlayer".to_string(),
+            vec!["%f".to_string()],
+            None,
+            Vec::new(),
+            None,
+        );
+
+        let query = normalize_query("resol");
+        assert!(
+            resolve.query_match_score(&query).unwrap_or_default()
+                > raw_player.query_match_score(&query).unwrap_or_default()
+        );
+    }
+
+    #[test]
+    fn shorter_prefix_match_scores_higher() {
+        let resolve = DesktopApp::new(
+            "DaVinci Resolve".to_string(),
+            "/opt/resolve/bin/resolve %u".to_string(),
+            "/opt/resolve/bin/resolve".to_string(),
+            vec!["%u".to_string()],
+            None,
+            Vec::new(),
+            None,
+        );
+        let control_panels = DesktopApp::new(
+            "DaVinci Control Panels Setup".to_string(),
+            "/opt/resolve/DaVinci Control Panels Setup/DaVinci Control".to_string(),
+            "/opt/resolve/DaVinci Control Panels Setup/DaVinci Control".to_string(),
+            Vec::new(),
+            None,
+            Vec::new(),
+            None,
+        );
+
+        let query = normalize_query("dav");
+        assert!(
+            resolve.query_match_score(&query).unwrap_or_default()
+                > control_panels.query_match_score(&query).unwrap_or_default()
+        );
     }
 
     #[test]
