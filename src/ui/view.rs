@@ -14,6 +14,7 @@ use iced::{Color, ContentFit, Element, Length, window};
 
 const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
+const ENTER_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M14 8V11.5C14 12.0523 13.5523 12.5 13 12.5H8" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 10L8 12.5L10.5 15" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 
 impl Launcher {
     pub(super) fn view(&self, _window: window::Id) -> Element<'_, Message> {
@@ -95,7 +96,10 @@ impl Launcher {
                         .size(14)
                         .color(Color::from_rgb(0.62, 0.64, 0.67)),
                 )
-                .padding([8, 0]),
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
             );
         } else {
             for (rank, index) in filtered.iter().copied().enumerate() {
@@ -154,13 +158,19 @@ impl Launcher {
     }
 
     fn view_bottom_strip(&self) -> Element<'_, Message> {
+        let (label_text, icon_svg) = if self.query.is_empty() && self.results_target == 0.0 {
+            ("Show more", SHOW_MORE_ICON_SVG)
+        } else {
+            ("Open", ENTER_ICON_SVG)
+        };
+
         let show_more = container(
             row![
-                text("Show more")
+                text(label_text)
                     .size(14)
                     .color(Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0)),
                 container(
-                    svg(SvgHandle::from_memory(SHOW_MORE_ICON_SVG))
+                    svg(SvgHandle::from_memory(icon_svg))
                         .width(Length::Fixed(22.0))
                         .height(Length::Fixed(22.0))
                 )

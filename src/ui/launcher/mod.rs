@@ -51,9 +51,10 @@ pub(super) struct Launcher {
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
     pub(super) scroll_start_rank: usize,
-    filtered_indices: Vec<usize>,
-    results_progress: f32,
-    results_target: f32,
+    pub(super) filtered_indices: Vec<usize>,
+    pub(super) results_progress: f32,
+    pub(super) results_target: f32,
+    pub(super) manually_expanded: bool,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
 }
@@ -118,6 +119,7 @@ impl Launcher {
                 filtered_indices: Vec::new(),
                 results_progress: 0.0,
                 results_target: 0.0,
+                manually_expanded: false,
                 icon_resolve_in_flight: false,
                 ipc_handle,
             },
@@ -130,15 +132,22 @@ impl Launcher {
     }
 
     fn refresh_filtered_indices(&mut self) {
-        let mut ranked_matches: Vec<(usize, i32)> = self
-            .apps
-            .iter()
-            .enumerate()
-            .filter_map(|(index, app)| {
-                app.query_match_score(&self.normalized_query)
-                    .map(|score| (index, score))
-            })
-            .collect();
+        let mut ranked_matches: Vec<(usize, i32)> = if self.normalized_query.is_empty() {
+            self.apps
+                .iter()
+                .enumerate()
+                .map(|(index, _)| (index, 0))
+                .collect()
+        } else {
+            self.apps
+                .iter()
+                .enumerate()
+                .filter_map(|(index, app)| {
+                    app.query_match_score(&self.normalized_query)
+                        .map(|score| (index, score))
+                })
+                .collect()
+        };
 
         if !self.normalized_query.is_empty() {
             ranked_matches.sort_by(|(left_index, left_score), (right_index, right_score)| {
@@ -173,12 +182,13 @@ impl Launcher {
     fn clear_window_state(&mut self) {
         self.query.clear();
         self.normalized_query.clear();
-        self.filtered_indices.clear();
+        self.refresh_filtered_indices();
         self.ignore_unfocus_until = None;
         self.selected_rank = 0;
         self.scroll_start_rank = 0;
         self.results_progress = 0.0;
         self.results_target = 0.0;
+        self.manually_expanded = false;
         self.icon_resolve_in_flight = false;
     }
 
@@ -187,7 +197,7 @@ impl Launcher {
     }
 
     pub(super) fn sync_results_target_with_query(&mut self) {
-        self.results_target = if self.normalized_query.is_empty() {
+        self.results_target = if self.normalized_query.is_empty() && !self.manually_expanded {
             0.0
         } else {
             1.0

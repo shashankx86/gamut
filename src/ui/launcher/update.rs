@@ -104,8 +104,14 @@ impl Launcher {
             keyboard::Event::KeyPressed { key, .. }
                 if matches!(key.as_ref(), Key::Named(Named::ArrowDown)) =>
             {
-                self.move_selection(1);
-                self.scroll_to_selected(false)
+                if self.normalized_query.is_empty() && self.results_target == 0.0 {
+                    self.results_target = 1.0;
+                    self.manually_expanded = true;
+                    Task::none()
+                } else {
+                    self.move_selection(1);
+                    self.scroll_to_selected(false)
+                }
             }
             keyboard::Event::KeyPressed { key, .. }
                 if matches!(key.as_ref(), Key::Named(Named::ArrowUp)) =>
