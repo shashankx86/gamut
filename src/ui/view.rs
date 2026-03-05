@@ -1,12 +1,19 @@
-use super::constants::{PANEL_WIDTH, RESULT_ROW_GAP, RESULT_ROW_HEIGHT, RESULTS_HEIGHT};
+use super::constants::{
+    PANEL_WIDTH, RESULT_ICON_BOX_SIZE, RESULT_ICON_SIZE, RESULT_ROW_GAP, RESULT_ROW_HEIGHT,
+    RESULTS_HEIGHT, RESULTS_SIDE_PADDING, SEARCH_ICON_SIZE,
+};
 use super::launcher::{Launcher, Message};
 use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
-    results_scroll_style, search_input_style,
+    results_scroll_style, search_input_style, show_more_icon_style,
 };
 use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
+use iced::widget::svg::Handle as SvgHandle;
 use iced::{Color, ContentFit, Element, Length, window};
+
+const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
+const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 
 impl Launcher {
     pub(super) fn view(&self, _window: window::Id) -> Element<'_, Message> {
@@ -19,8 +26,8 @@ impl Launcher {
         }
 
         let mut content = column![self.view_search_header()]
-            .spacing(8)
-            .width(Length::Fixed(PANEL_WIDTH))
+            .spacing(0)
+            .width(Length::Fill)
             .height(Length::Shrink);
 
         if self.results_progress() > 0.0 {
@@ -37,9 +44,10 @@ impl Launcher {
             .push(self.view_bottom_strip());
 
         let launcher_panel = container(content)
-            .padding([10, 14])
+            .padding(0)
             .style(|_| panel_style())
-            .width(Length::Fixed(PANEL_WIDTH))
+            .width(Length::Fill)
+            .max_width(PANEL_WIDTH as u32)
             .height(Length::Shrink);
 
         container(launcher_panel)
@@ -53,14 +61,27 @@ impl Launcher {
     }
 
     fn view_search_header(&self) -> Element<'_, Message> {
-        text_input("Search for apps and commands...", &self.query)
+        let input = text_input("Search for apps and commands...", &self.query)
             .id(self.input_id.clone())
             .on_input(Message::QueryChanged)
             .on_submit(Message::LaunchFirstMatch)
-            .padding([10, 4])
-            .size(16)
+            .padding([11, 0])
+            .size(20)
             .style(search_input_style)
-            .into()
+            .width(Length::Fill);
+
+        row![
+            svg(SvgHandle::from_memory(SEARCH_ICON_SVG))
+                .width(Length::Fixed(SEARCH_ICON_SIZE))
+                .height(Length::Fixed(SEARCH_ICON_SIZE)),
+            input,
+        ]
+        .width(Length::Fill)
+        .height(Length::Fixed(55.0))
+        .padding([0, 20])
+        .spacing(10)
+        .align_y(iced::alignment::Vertical::Center)
+        .into()
     }
 
     fn view_results_section(&self, progress: f32) -> Element<'_, Message> {
@@ -96,7 +117,7 @@ impl Launcher {
         container(list)
             .width(Length::Fill)
             .height(Length::Fixed(RESULTS_HEIGHT * progress))
-            .padding([2, 0])
+            .padding([6, RESULTS_SIDE_PADDING])
             .into()
     }
 
@@ -104,10 +125,10 @@ impl Launcher {
         let app = &self.apps[index];
 
         let left = row![
-            container(self.view_app_icon(app, 26.0))
-                .width(Length::Fixed(32.0))
-                .height(Length::Fixed(32.0))
-                .padding([0, 2]),
+            container(self.view_app_icon(app, RESULT_ICON_SIZE))
+                .width(Length::Fixed(RESULT_ICON_BOX_SIZE))
+                .height(Length::Fixed(RESULT_ICON_BOX_SIZE))
+                .padding([0, 3]),
             column![
                 text(&app.name)
                     .size(14)
@@ -125,7 +146,7 @@ impl Launcher {
 
         button(left)
             .on_press(Message::LaunchIndex(index))
-            .padding([6, 8])
+            .padding([5, 10])
             .width(Length::Fill)
             .height(Length::Fixed(RESULT_ROW_HEIGHT))
             .style(move |_theme, status| result_button_style(status, first_row))
@@ -133,41 +154,40 @@ impl Launcher {
     }
 
     fn view_bottom_strip(&self) -> Element<'_, Message> {
-        let selected_app = if self.query.trim().is_empty() {
-            None
-        } else {
-            self.selected_result_index()
-                .and_then(|index| self.apps.get(index))
-        };
-
-        let (icon, label) = if let Some(app) = selected_app {
-            (self.view_app_icon(app, 16.0), app.name.clone())
-        } else {
-            (
-                text("⌕")
-                    .size(15)
-                    .color(Color::from_rgb(0.66, 0.68, 0.71))
-                    .into(),
-                "Search".to_string(),
-            )
-        };
+        let show_more = container(
+            row![
+                text("Show more")
+                    .size(14)
+                    .color(Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0)),
+                container(
+                    svg(SvgHandle::from_memory(SHOW_MORE_ICON_SVG))
+                        .width(Length::Fixed(22.0))
+                        .height(Length::Fixed(22.0))
+                )
+                .width(Length::Fixed(22.0))
+                .height(Length::Fixed(22.0))
+                .center_x(Length::Shrink)
+                .center_y(Length::Shrink)
+                .style(|_| show_more_icon_style()),
+            ]
+            .align_y(iced::alignment::Vertical::Center)
+            .spacing(6),
+        )
+        .height(Length::Fill)
+        .center_y(Length::Fill);
 
         container(
             row![
-                container(icon)
-                    .width(Length::Fixed(20.0))
-                    .height(Length::Fixed(20.0))
-                    .center_x(Length::Shrink)
-                    .center_y(Length::Shrink),
-                text(label)
-                    .size(11)
-                    .color(Color::from_rgb(0.82, 0.83, 0.85)),
+                container("").width(Length::Fill),
+                show_more,
             ]
             .width(Length::Fill)
+            .height(Length::Fill)
             .align_y(iced::alignment::Vertical::Center)
-            .spacing(8),
+            .spacing(0),
         )
-        .padding([6, 2])
+        .height(Length::Fixed(31.0))
+        .padding([0, 8])
         .style(|_| bottom_strip_style())
         .into()
     }

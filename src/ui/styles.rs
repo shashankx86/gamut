@@ -20,11 +20,11 @@ pub(super) fn panel_style() -> container::Style {
         background: Some(Background::Color(Color::from_rgba(
             21.0 / 255.0,
             21.0 / 255.0,
-            21.0 / 255.0,
-            0.97,
+            22.0 / 255.0,
+            1.0,
         ))),
         border: Border {
-            color: Color::from_rgba(26.0 / 255.0, 27.0 / 255.0, 32.0 / 255.0, 0.76),
+            color: Color::from_rgba(48.0 / 255.0, 49.0 / 255.0, 52.0 / 255.0, 0.95),
             width: 1.0,
             radius: PANEL_RADIUS.into(),
         },
@@ -39,7 +39,7 @@ pub(super) fn divider_style() -> container::Style {
             46.0 / 255.0,
             46.0 / 255.0,
             46.0 / 255.0,
-            0.72,
+            0.86,
         ))),
         ..container::Style::default()
     }
@@ -47,15 +47,17 @@ pub(super) fn divider_style() -> container::Style {
 
 pub(super) fn bottom_strip_style() -> container::Style {
     container::Style {
-        text_color: Some(Color::from_rgb(0.73, 0.75, 0.79)),
+        text_color: Some(Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0)),
         ..container::Style::default()
     }
 }
 
 pub(super) fn search_input_style(_theme: &Theme, status: text_input::Status) -> text_input::Style {
     let placeholder = match status {
-        text_input::Status::Focused { .. } => Color::from_rgb(0.62, 0.64, 0.68),
-        _ => Color::from_rgb(0.53, 0.55, 0.59),
+        text_input::Status::Focused { .. } => {
+            Color::from_rgb(138.0 / 255.0, 142.0 / 255.0, 149.0 / 255.0)
+        }
+        _ => Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0),
     };
 
     text_input::Style {
@@ -65,11 +67,15 @@ pub(super) fn search_input_style(_theme: &Theme, status: text_input::Status) -> 
             width: 0.0,
             radius: 8.0.into(),
         },
-        icon: Color::from_rgb(0.48, 0.50, 0.55),
+        icon: Color::from_rgb(114.0 / 255.0, 114.0 / 255.0, 114.0 / 255.0),
         placeholder,
-        value: Color::from_rgb(0.94, 0.95, 0.97),
+        value: Color::from_rgb(205.0 / 255.0, 208.0 / 255.0, 214.0 / 255.0),
         selection: Color::from_rgba(0.31, 0.31, 0.34, 0.88),
     }
+}
+
+pub(super) fn show_more_icon_style() -> container::Style {
+    container::Style::default()
 }
 
 pub(super) fn result_button_style(status: button::Status, first_row: bool) -> button::Style {
