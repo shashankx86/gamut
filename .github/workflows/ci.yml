@@ -1,4 +1,4 @@
-name: CI
+name: Build and Release
 
 on:
   push:
@@ -176,18 +176,21 @@ jobs:
         run: |
           cd target/x86_64-unknown-linux-gnu/release
           ARCHIVE_NAME="${{ steps.archive_name.outputs.name }}"
+          # Find original files
+          ORIGINAL_TAR=$(ls *.tar.gz | grep -v "$ARCHIVE_NAME" | head -1)
+          ORIGINAL_SHA=$(ls *.sha256 2>/dev/null | head -1)
           # For dev builds, extract, rename binary, and re-archive
           if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
-            ORIGINAL_TAR=$(ls *.tar.gz | head -1)
             mkdir -p tmp && tar xzf "$ORIGINAL_TAR" -C tmp
             mv tmp/gamut "tmp/gamut-${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu"
             tar czf "$ARCHIVE_NAME" -C tmp .
             rm -rf tmp "$ORIGINAL_TAR"
           else
-            mv *.tar.gz "$ARCHIVE_NAME" 2>/dev/null || true
+            mv "$ORIGINAL_TAR" "$ARCHIVE_NAME" 2>/dev/null || true
           fi
-          # Clean up bare binary and regenerate checksum
+          # Clean up bare binary and rename checksum
           rm -f gamut gamut.d
+          rm -f *.sha256 2>/dev/null || true
           sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
       - uses: actions/upload-artifact@v4
         with:
@@ -228,18 +231,21 @@ jobs:
         run: |
           cd target/aarch64-unknown-linux-gnu/release
           ARCHIVE_NAME="${{ steps.archive_name.outputs.name }}"
+          # Find original files
+          ORIGINAL_TAR=$(ls *.tar.gz | grep -v "$ARCHIVE_NAME" | head -1)
+          ORIGINAL_SHA=$(ls *.sha256 2>/dev/null | head -1)
           # For dev builds, extract, rename binary, and re-archive
           if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
-            ORIGINAL_TAR=$(ls *.tar.gz | head -1)
             mkdir -p tmp && tar xzf "$ORIGINAL_TAR" -C tmp
             mv tmp/gamut "tmp/gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu"
             tar czf "$ARCHIVE_NAME" -C tmp .
             rm -rf tmp "$ORIGINAL_TAR"
           else
-            mv *.tar.gz "$ARCHIVE_NAME" 2>/dev/null || true
+            mv "$ORIGINAL_TAR" "$ARCHIVE_NAME" 2>/dev/null || true
           fi
-          # Clean up bare binary and regenerate checksum
+          # Clean up bare binary and rename checksum
           rm -f gamut gamut.d
+          rm -f *.sha256 2>/dev/null || true
           sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
       - uses: actions/upload-artifact@v4
         with:
