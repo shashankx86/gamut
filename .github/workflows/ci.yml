@@ -34,6 +34,10 @@ jobs:
       - name: Checkout specific commit
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
         run: git checkout ${{ github.event.inputs.commit }}
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglib2.0-dev libgtk-4-dev libwayland-dev
       - name: Run tests
         run: cargo test --release
       - name: Build
