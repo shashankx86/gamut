@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IpcCommand {
+    Show,
     Toggle,
     Quit,
     Ping,
@@ -8,6 +9,7 @@ pub enum IpcCommand {
 impl IpcCommand {
     pub(super) fn as_wire(self) -> &'static str {
         match self {
+            Self::Show => "show\n",
             Self::Toggle => "toggle\n",
             Self::Quit => "quit\n",
             Self::Ping => "ping\n",
@@ -16,6 +18,7 @@ impl IpcCommand {
 
     pub(super) fn from_wire(line: &str) -> Option<Self> {
         match line.trim() {
+            "show" => Some(Self::Show),
             "toggle" => Some(Self::Toggle),
             "quit" => Some(Self::Quit),
             "ping" => Some(Self::Ping),
@@ -30,6 +33,7 @@ mod tests {
 
     #[test]
     fn parses_wire_commands() {
+        assert_eq!(IpcCommand::from_wire("show"), Some(IpcCommand::Show));
         assert_eq!(IpcCommand::from_wire("toggle"), Some(IpcCommand::Toggle));
         assert_eq!(IpcCommand::from_wire("quit"), Some(IpcCommand::Quit));
         assert_eq!(IpcCommand::from_wire("ping"), Some(IpcCommand::Ping));
@@ -38,6 +42,7 @@ mod tests {
 
     #[test]
     fn writes_wire_commands() {
+        assert_eq!(IpcCommand::Show.as_wire(), "show\n");
         assert_eq!(IpcCommand::Toggle.as_wire(), "toggle\n");
         assert_eq!(IpcCommand::Quit.as_wire(), "quit\n");
         assert_eq!(IpcCommand::Ping.as_wire(), "ping\n");

@@ -58,6 +58,7 @@ impl Launcher {
 
     fn handle_ipc_command(&mut self, command: IpcCommand) -> Task<Message> {
         match command {
+            IpcCommand::Show => self.show_launcher(),
             IpcCommand::Toggle => {
                 if self.is_visible {
                     self.hide_launcher()

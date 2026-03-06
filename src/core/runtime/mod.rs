@@ -1,5 +1,6 @@
 use crate::core::cli::{CliMode, parse_mode};
 use crate::core::ipc::{self, IpcCommand};
+use crate::core::tray;
 use crate::ui;
 use std::env;
 use std::error::Error;
@@ -24,6 +25,7 @@ fn run_daemon() -> Result<(), DynError> {
         return Err("gamut daemon is already running".into());
     }
 
+    let _tray_service = tray::start()?;
     ui::run_daemon()
 }
 
