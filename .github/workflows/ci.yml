@@ -64,6 +64,10 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             # Manual trigger
             TAG="${{ github.event.inputs.tag }}"
+            # Ensure tag starts with 'v'
+            if [[ ! "$TAG" =~ ^v[0-9] ]]; then
+              TAG="v$TAG"
+            fi
             TITLE="${{ github.event.inputs.release_title }}"
             if [ -z "$TITLE" ]; then
               TITLE="$TAG"
@@ -132,7 +136,8 @@ jobs:
         id: validate
         with:
           command: validate-version
-          expected-version: ${{ needs.prepare.outputs.tag }}
+          tag: ${{ needs.prepare.outputs.tag }}
+          expected-version: ${{ needs.prepare.outputs.version }}
 
   build-x86_64:
     needs: [prepare, validate]
@@ -152,18 +157,10 @@ jobs:
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
           cargo update --workspace
       - run: rustup toolchain install stable --profile minimal
-      - name: Set binary name
-        id: binary_name
-        run: |
-          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
-            echo "name=gamut-${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT
-          else
-            echo "name=gamut" >> $GITHUB_OUTPUT
-          fi
       - name: Set archive name
         id: archive_name
         run: |
-          echo "name=gamut-${{ needs.prepare.outputs.version }}.tar.gz" >> $GITHUB_OUTPUT
+          echo "name=gamut-${{ needs.prepare.outputs.version }}-x86_64.tar.gz" >> $GITHUB_OUTPUT
       - uses: michaelklishin/rust-build-package-release-action@v1
         id: build
         with:
@@ -171,16 +168,27 @@ jobs:
           target: x86_64-unknown-linux-gnu
           locked: 'true'
           archive: 'true'
-          binary-name: ${{ steps.binary_name.outputs.name }}
           pre-build: |
             sudo apt-get update && \
             sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
               libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
-      - name: Rename archive
+      - name: Rename binary and archive
         run: |
           cd target/x86_64-unknown-linux-gnu/release
-          mv *.tar.gz ${{ steps.archive_name.outputs.name }} 2>/dev/null || true
-          mv *.sha256 ${{ steps.archive_name.outputs.name }}.sha256 2>/dev/null || true
+          ARCHIVE_NAME="${{ steps.archive_name.outputs.name }}"
+          # For dev builds, extract, rename binary, and re-archive
+          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
+            ORIGINAL_TAR=$(ls *.tar.gz | head -1)
+            mkdir -p tmp && tar xzf "$ORIGINAL_TAR" -C tmp
+            mv tmp/gamut "tmp/gamut-${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu"
+            tar czf "$ARCHIVE_NAME" -C tmp .
+            rm -rf tmp "$ORIGINAL_TAR"
+          else
+            mv *.tar.gz "$ARCHIVE_NAME" 2>/dev/null || true
+          fi
+          # Clean up bare binary and regenerate checksum
+          rm -f gamut gamut.d
+          sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: x86_64-unknown-linux-gnu
@@ -200,18 +208,10 @@ jobs:
       - name: Checkout specific commit
         if: ${{ needs.prepare.outputs.commit != '' }}
         run: git checkout ${{ needs.prepare.outputs.commit }}
-      - name: Set binary name
-        id: binary_name
-        run: |
-          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
-            echo "name=gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu" >> $GITHUB_OUTPUT
-          else
-            echo "name=gamut" >> $GITHUB_OUTPUT
-          fi
       - name: Set archive name
         id: archive_name
         run: |
-          echo "name=gamut-${{ needs.prepare.outputs.version }}.tar.gz" >> $GITHUB_OUTPUT
+          echo "name=gamut-${{ needs.prepare.outputs.version }}-aarch64.tar.gz" >> $GITHUB_OUTPUT
       - run: rustup toolchain install stable --profile minimal
       - uses: michaelklishin/rust-build-package-release-action@v1
         id: build
@@ -220,16 +220,27 @@ jobs:
           target: aarch64-unknown-linux-gnu
           locked: 'true'
           archive: 'true'
-          binary-name: ${{ steps.binary_name.outputs.name }}
           pre-build: |
             sudo apt-get update && \
             sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
               libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
-      - name: Rename archive
+      - name: Rename binary and archive
         run: |
           cd target/aarch64-unknown-linux-gnu/release
-          mv *.tar.gz ${{ steps.archive_name.outputs.name }} 2>/dev/null || true
-          mv *.sha256 ${{ steps.archive_name.outputs.name }}.sha256 2>/dev/null || true
+          ARCHIVE_NAME="${{ steps.archive_name.outputs.name }}"
+          # For dev builds, extract, rename binary, and re-archive
+          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
+            ORIGINAL_TAR=$(ls *.tar.gz | head -1)
+            mkdir -p tmp && tar xzf "$ORIGINAL_TAR" -C tmp
+            mv tmp/gamut "tmp/gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu"
+            tar czf "$ARCHIVE_NAME" -C tmp .
+            rm -rf tmp "$ORIGINAL_TAR"
+          else
+            mv *.tar.gz "$ARCHIVE_NAME" 2>/dev/null || true
+          fi
+          # Clean up bare binary and regenerate checksum
+          rm -f gamut gamut.d
+          sha256sum "$ARCHIVE_NAME" > "$ARCHIVE_NAME.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: aarch64-unknown-linux-gnu
@@ -252,7 +263,9 @@ jobs:
         run: |
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
           cargo update --workspace
-      - uses: michaelklishin/rust-build-package-release-action@v1
+      - name: Extract changelog
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        uses: michaelklishin/rust-build-package-release-action@v1
         with:
           command: extract-changelog
           version: ${{ needs.prepare.outputs.version }}
@@ -263,8 +276,12 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
+          echo "Artifacts directory contents:"
+          ls -la artifacts/ || true
           find artifacts -type f -name '*.tar.gz' -exec cp {} release/ \;
           find artifacts -type f -name '*.sha256' -exec cp {} release/ \;
+          echo "Release directory contents:"
+          ls -la release/
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -273,9 +290,9 @@ jobs:
           prerelease: ${{ needs.prepare.outputs.prerelease }}
           body_path: ${{ github.workspace }}/release_notes.md
           files: release/*
-        continue-on-error: true
+        if: hashFiles('release_notes.md') != ''
       - name: Create GitHub release (no changelog)
-        if: failure()
+        if: hashFiles('release_notes.md') == ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
