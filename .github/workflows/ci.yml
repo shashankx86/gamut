@@ -152,6 +152,18 @@ jobs:
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
           cargo update --workspace
       - run: rustup toolchain install stable --profile minimal
+      - name: Set binary name
+        id: binary_name
+        run: |
+          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
+            echo "name=gamut-${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu" >> $GITHUB_OUTPUT
+          else
+            echo "name=gamut" >> $GITHUB_OUTPUT
+          fi
+      - name: Set archive name
+        id: archive_name
+        run: |
+          echo "name=gamut-${{ needs.prepare.outputs.version }}.tar.gz" >> $GITHUB_OUTPUT
       - uses: michaelklishin/rust-build-package-release-action@v1
         id: build
         with:
@@ -159,10 +171,16 @@ jobs:
           target: x86_64-unknown-linux-gnu
           locked: 'true'
           archive: 'true'
+          binary-name: ${{ steps.binary_name.outputs.name }}
           pre-build: |
             sudo apt-get update && \
             sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
               libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
+      - name: Rename archive
+        run: |
+          cd target/x86_64-unknown-linux-gnu/release
+          mv *.tar.gz ${{ steps.archive_name.outputs.name }} 2>/dev/null || true
+          mv *.sha256 ${{ steps.archive_name.outputs.name }}.sha256 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: x86_64-unknown-linux-gnu
@@ -173,8 +191,8 @@ jobs:
   build-aarch64:
     needs: [prepare, validate]
     if: ${{ always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped') }}
-    timeout-minutes: 45
-    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -182,30 +200,36 @@ jobs:
       - name: Checkout specific commit
         if: ${{ needs.prepare.outputs.commit != '' }}
         run: git checkout ${{ needs.prepare.outputs.commit }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      - name: Build in ARM64 container
+      - name: Set binary name
+        id: binary_name
         run: |
-          docker run --rm --platform linux/arm64 \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            -e CARGO_HOME=/workspace/.cargo \
-            ubuntu:22.04 bash -c "
-              apt-get update && \
-              apt-get install -y curl build-essential libglib2.0-dev libgtk-3-dev libatk1.0-dev \
-                libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config && \
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && \
-              source \$HOME/.cargo/env && \
-              rustup target add aarch64-unknown-linux-gnu && \
-              sed -i 's/^version = \"[^\"]*\"/version = \"${{ needs.prepare.outputs.version }}\"/g' Cargo.toml && \
-              cargo update --workspace && \
-              cargo build --release --target aarch64-unknown-linux-gnu && \
-              cd target/aarch64-unknown-linux-gnu/release && \
-              tar czf gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz gamut && \
-              sha256sum gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz > gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz.sha256
-            "
+          if [ "${{ needs.prepare.outputs.is_push_main }}" == "true" ]; then
+            echo "name=gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu" >> $GITHUB_OUTPUT
+          else
+            echo "name=gamut" >> $GITHUB_OUTPUT
+          fi
+      - name: Set archive name
+        id: archive_name
+        run: |
+          echo "name=gamut-${{ needs.prepare.outputs.version }}.tar.gz" >> $GITHUB_OUTPUT
+      - run: rustup toolchain install stable --profile minimal
+      - uses: michaelklishin/rust-build-package-release-action@v1
+        id: build
+        with:
+          command: release-linux
+          target: aarch64-unknown-linux-gnu
+          locked: 'true'
+          archive: 'true'
+          binary-name: ${{ steps.binary_name.outputs.name }}
+          pre-build: |
+            sudo apt-get update && \
+            sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
+              libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
+      - name: Rename archive
+        run: |
+          cd target/aarch64-unknown-linux-gnu/release
+          mv *.tar.gz ${{ steps.archive_name.outputs.name }} 2>/dev/null || true
+          mv *.sha256 ${{ steps.archive_name.outputs.name }}.sha256 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: aarch64-unknown-linux-gnu
