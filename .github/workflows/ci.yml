@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name for the release'
+        required: true
+        type: string
+      release_title:
+        description: 'Release title (defaults to tag)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Whether to mark the release as a prerelease'
+        required: true
+        type: boolean
+        default: true
+      commit:
+        description: 'Commit sha to build from (optional)'
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
+        run: git checkout ${{ github.event.inputs.commit }}
+      - name: Run tests
+        run: cargo test --release
+      - name: Build
+        run: cargo build --release
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ success() }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
+        run: git checkout ${{ github.event.inputs.commit }}
+      - name: Determine release info
+        id: vars
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            if [ -z "$TAG" ]; then
+              echo "tag input is required" >&2
+              exit 1
+            fi
+            TITLE="${{ github.event.inputs.release_title }}"
+            if [ -z "$TITLE" ]; then
+              TITLE="$TAG"
+            fi
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            TAG="pre-${GITHUB_SHA}"
+            TITLE="$TAG"
+            PRERELEASE=true
+          fi
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "RELEASE_TITLE=$TITLE" >> "$GITHUB_ENV"
+          echo "RELEASE_PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TITLE }}
+          prerelease: ${{ env.RELEASE_PRERELEASE }}
+          files: |
+            target/release/gamut*
