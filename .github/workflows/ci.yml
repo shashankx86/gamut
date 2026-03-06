@@ -53,6 +53,7 @@ jobs:
       prerelease: ${{ steps.info.outputs.prerelease }}
       commit: ${{ steps.info.outputs.commit }}
       is_push_main: ${{ steps.info.outputs.is_push_main }}
+      needs_validation: ${{ steps.info.outputs.needs_validation }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,6 +72,7 @@ jobs:
             COMMIT="${{ github.event.inputs.commit }}"
             VERSION="${TAG#v}"
             IS_PUSH_MAIN="false"
+            NEEDS_VALIDATION="true"
           elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             # Tag push
             TAG="${{ github.ref_name }}"
@@ -79,6 +81,7 @@ jobs:
             COMMIT=""
             VERSION="${TAG#v}"
             IS_PUSH_MAIN="false"
+            NEEDS_VALIDATION="true"
           else
             # Push to main - create dev version
             CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
@@ -89,6 +92,7 @@ jobs:
             COMMIT=""
             VERSION="${CURRENT_VERSION}-dev.${SHORT_SHA}"
             IS_PUSH_MAIN="true"
+            NEEDS_VALIDATION="false"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -96,6 +100,7 @@ jobs:
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
           echo "is_push_main=$IS_PUSH_MAIN" >> "$GITHUB_OUTPUT"
+          echo "needs_validation=$NEEDS_VALIDATION" >> "$GITHUB_OUTPUT"
       - name: Checkout specific commit
         if: ${{ steps.info.outputs.commit != '' }}
         run: git checkout ${{ steps.info.outputs.commit }}
@@ -103,9 +108,11 @@ jobs:
         if: ${{ steps.info.outputs.is_push_main == 'true' }}
         run: |
           sed -i 's/^version = "[^"]*"/version = "${{ steps.info.outputs.version }}"/' Cargo.toml
+          cargo update --workspace
 
   validate:
     needs: prepare
+    if: ${{ needs.prepare.outputs.needs_validation == 'true' }}
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.validate.outputs.version }}
@@ -120,52 +127,17 @@ jobs:
         if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
         run: |
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+          cargo update --workspace
       - uses: michaelklishin/rust-build-package-release-action@v1
         id: validate
         with:
           command: validate-version
           expected-version: ${{ needs.prepare.outputs.tag }}
 
-  build:
+  build-x86_64:
     needs: [prepare, validate]
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-22.04
-          - target: aarch64-unknown-linux-gnu
-            os: ubuntu-22.04
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Checkout specific commit
-        if: ${{ needs.prepare.outputs.commit != '' }}
-        run: git checkout ${{ needs.prepare.outputs.commit }}
-      - name: Update Cargo.toml version for dev builds
-        if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
-        run: |
-          sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
-      - run: rustup toolchain install stable --profile minimal
-      - uses: michaelklishin/rust-build-package-release-action@v1
-        id: build
-        with:
-          command: release-linux
-          target: ${{ matrix.target }}
-          locked: 'true'
-          archive: 'true'
-          pre-build: |
-            sudo apt-get update && \
-            sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
-              libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/*.tar.gz
-
-  release:
-    needs: [prepare, build]
+    if: ${{ always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped') }}
+    timeout-minutes: 30
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -178,6 +150,84 @@ jobs:
         if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
         run: |
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+          cargo update --workspace
+      - run: rustup toolchain install stable --profile minimal
+      - uses: michaelklishin/rust-build-package-release-action@v1
+        id: build
+        with:
+          command: release-linux
+          target: x86_64-unknown-linux-gnu
+          locked: 'true'
+          archive: 'true'
+          pre-build: |
+            sudo apt-get update && \
+            sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
+              libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x86_64-unknown-linux-gnu
+          path: |
+            target/x86_64-unknown-linux-gnu/release/*.tar.gz
+            target/x86_64-unknown-linux-gnu/release/*.sha256
+
+  build-aarch64:
+    needs: [prepare, validate]
+    if: ${{ always() && (needs.validate.result == 'success' || needs.validate.result == 'skipped') }}
+    timeout-minutes: 45
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ needs.prepare.outputs.commit != '' }}
+        run: git checkout ${{ needs.prepare.outputs.commit }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Build in ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            -e CARGO_HOME=/workspace/.cargo \
+            ubuntu:22.04 bash -c "
+              apt-get update && \
+              apt-get install -y curl build-essential libglib2.0-dev libgtk-3-dev libatk1.0-dev \
+                libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config && \
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && \
+              source \$HOME/.cargo/env && \
+              rustup target add aarch64-unknown-linux-gnu && \
+              sed -i 's/^version = \"[^\"]*\"/version = \"${{ needs.prepare.outputs.version }}\"/g' Cargo.toml && \
+              cargo update --workspace && \
+              cargo build --release --target aarch64-unknown-linux-gnu && \
+              cd target/aarch64-unknown-linux-gnu/release && \
+              tar czf gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz gamut && \
+              sha256sum gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz > gamut-${{ needs.prepare.outputs.version }}-aarch64-unknown-linux-gnu.tar.gz.sha256
+            "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aarch64-unknown-linux-gnu
+          path: |
+            target/aarch64-unknown-linux-gnu/release/*.tar.gz
+            target/aarch64-unknown-linux-gnu/release/*.sha256
+
+  release:
+    needs: [prepare, build-x86_64, build-aarch64]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ needs.prepare.outputs.commit != '' }}
+        run: git checkout ${{ needs.prepare.outputs.commit }}
+      - name: Update Cargo.toml version for dev builds
+        if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
+        run: |
+          sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+          cargo update --workspace
       - uses: michaelklishin/rust-build-package-release-action@v1
         with:
           command: extract-changelog
