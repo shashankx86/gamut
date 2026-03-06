@@ -1,0 +1,40 @@
+<svg viewBox="0 0 608 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .main-c1 { fill: #18181B; }
+    .main-c2 { fill: #27272A; }
+    .main-c3 { fill: #3F3F46; }
+    .main-c4 { fill: #52525B; }
+    .main-c5 { fill: #71717A; }
+  </style>
+  
+  <!-- G -->
+  <rect x="0" y="0" width="32" height="128" class="main-c1"/>
+  <rect x="32" y="0" width="64" height="32" class="main-c2"/>
+  <rect x="32" y="48" width="32" height="32" class="main-c3"/>
+  <rect x="64" y="48" width="32" height="48" class="main-c4"/>
+  <rect x="32" y="96" width="64" height="32" class="main-c5"/>
+
+  <!-- a -->
+  <rect x="120" y="48" width="64" height="32" class="main-c2"/>
+  <rect x="184" y="48" width="32" height="80" class="main-c4"/>
+  <rect x="120" y="80" width="32" height="16" class="main-c1"/>
+  <rect x="120" y="96" width="64" height="32" class="main-c5"/>
+
+  <!-- m -->
+  <rect x="240" y="48" width="32" height="80" class="main-c1"/>
+  <rect x="272" y="48" width="32" height="32" class="main-c2"/>
+  <rect x="304" y="48" width="32" height="80" class="main-c3"/>
+  <rect x="336" y="48" width="32" height="32" class="main-c2"/>
+  <rect x="368" y="48" width="32" height="80" class="main-c4"/>
+
+  <!-- u -->
+  <rect x="424" y="48" width="32" height="80" class="main-c1"/>
+  <rect x="456" y="96" width="32" height="32" class="main-c5"/>
+  <rect x="488" y="48" width="32" height="80" class="main-c4"/>
+
+  <!-- t -->
+  <rect x="560" y="0" width="32" height="48" class="main-c1"/>
+  <rect x="536" y="48" width="72" height="32" class="main-c2"/>
+  <rect x="560" y="80" width="32" height="16" class="main-c1"/>
+  <rect x="560" y="96" width="48" height="32" class="main-c5"/>
+</svg>

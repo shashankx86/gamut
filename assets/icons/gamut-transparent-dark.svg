@@ -1,0 +1,16 @@
+<svg viewBox="64 64 96 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .main-bg { fill: #18181B; }
+    .main-c1 { fill: #FFFFFF; }
+    .main-c2 { fill: #E4E4E7; }
+    .main-c3 { fill: #D4D4D8; }
+    .main-c4 { fill: #A1A1AA; }
+    .main-c5 { fill: #71717A; }
+  </style>
+  
+  <rect x="64" y="64" width="32" height="128" class="main-c1"/>
+  <rect x="96" y="64" width="64" height="32" class="main-c2"/>
+  <rect x="96" y="112" width="32" height="32" class="main-c3"/>
+  <rect x="128" y="112" width="32" height="48" class="main-c4"/>
+  <rect x="96" y="160" width="64" height="32" class="main-c5"/>
+</svg>

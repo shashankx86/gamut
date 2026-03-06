@@ -164,6 +164,14 @@ impl Launcher {
             ("Open", ENTER_ICON_SVG)
         };
 
+        let logo = container(
+            svg(SvgHandle::from_memory(include_bytes!("../../assets/icons/gamut-full-transparent-dark.svg")))
+                .width(Length::Fixed(66.0))
+                .height(Length::Fixed(14.0))
+        )
+        .padding([0, 4])
+        .center_y(Length::Fill);
+
         let show_more = container(
             row![
                 text(label_text)
@@ -188,6 +196,7 @@ impl Launcher {
 
         container(
             row![
+                logo,
                 container("").width(Length::Fill),
                 show_more,
             ]
