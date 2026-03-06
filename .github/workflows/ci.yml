@@ -26,7 +26,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,15 +37,20 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libglib2.0-dev libgtk-4-dev libwayland-dev
+          sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
       - name: Run tests
         run: cargo test --release
       - name: Build
         run: cargo build --release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamut-binary
+          path: target/release/gamut
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: ${{ success() }}
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +59,11 @@ jobs:
       - name: Checkout specific commit
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
         run: git checkout ${{ github.event.inputs.commit }}
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gamut-binary
+          path: target/release/
       - name: Determine release info
         id: vars
         run: |
