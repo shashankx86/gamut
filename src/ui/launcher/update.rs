@@ -1,4 +1,4 @@
-use super::super::constants::{RESULT_ROW_SCROLL_STEP, RESULTS_HEIGHT, UNFOCUS_GUARD_MS};
+use super::super::constants::UNFOCUS_GUARD_MS;
 use super::{Launcher, Message};
 use crate::core::ipc::IpcCommand;
 use iced::keyboard::{self, Key, key::Named};
@@ -22,7 +22,7 @@ impl Launcher {
             Message::QueryChanged(query) => {
                 self.update_query(query);
                 Task::batch(vec![
-                    self.scroll_to_selected(true),
+                    self.scroll_to_selected(self.selected_rank, true),
                     self.request_icon_resolution_for_visible(),
                 ])
             }
@@ -39,6 +39,11 @@ impl Launcher {
             Message::WindowClosed(id) => self.on_window_closed(id),
             Message::KeyboardEvent(id, key_event) => self.handle_key_event(id, key_event),
             Message::WindowEvent(id, window_event) => self.handle_window_event(id, window_event),
+            Message::MonitorSizeLoaded(size) => self.update_layout(size),
+            Message::SyncHighlightedRank { revision, rank } => {
+                self.sync_highlighted_rank(revision, rank);
+                Task::none()
+            }
             Message::FatalError(error) => {
                 eprintln!("{error}");
                 iced::exit()
@@ -66,13 +71,20 @@ impl Launcher {
     }
 
     fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
-        if self.window_id != Some(id) || !self.is_visible {
+        if self.window_id != Some(id) {
             return Task::none();
+        }
+
+        let monitor_size = window::monitor_size(id).map(Message::MonitorSizeLoaded);
+
+        if !self.is_visible {
+            return monitor_size;
         }
 
         self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
 
         Task::batch(vec![
+            monitor_size,
             widget::operation::focus(self.input_id.clone()),
             widget::operation::move_cursor_to_end(self.input_id.clone()),
             self.request_icon_resolution_for_visible(),
@@ -108,23 +120,28 @@ impl Launcher {
                     self.manually_expanded = true;
                     Task::none()
                 } else {
+                    let previous_rank = self.selected_rank;
+                    self.selection_revision = self.selection_revision.wrapping_add(1);
                     self.move_selection(1);
-                    self.scroll_to_selected(false)
+                    self.scroll_to_selected(previous_rank, false)
                 }
             }
             keyboard::Event::KeyPressed { key, .. }
                 if matches!(key.as_ref(), Key::Named(Named::ArrowUp)) =>
             {
+                let previous_rank = self.selected_rank;
+                self.selection_revision = self.selection_revision.wrapping_add(1);
                 self.move_selection(-1);
-                self.scroll_to_selected(false)
+                self.scroll_to_selected(previous_rank, false)
             }
             _ => Task::none(),
         }
     }
 
-    fn scroll_to_selected(&mut self, force: bool) -> Task<Message> {
+    fn scroll_to_selected(&mut self, previous_rank: usize, force: bool) -> Task<Message> {
         if self.selected_result_index().is_none() {
             self.scroll_start_rank = 0;
+            self.highlighted_rank = 0;
             return if force {
                 widget::operation::scroll_to(
                     self.results_scroll_id.clone(),
@@ -138,33 +155,45 @@ impl Launcher {
             };
         }
 
-        let visible_rows = ((RESULTS_HEIGHT / RESULT_ROW_SCROLL_STEP).floor() as usize).max(1);
+        let visible_rows = self.layout.visible_result_rows();
         let total_rows = self.filtered_indices().len();
-        let max_start = total_rows.saturating_sub(visible_rows);
-        let previous_start = self.scroll_start_rank.min(max_start);
-        let mut start = previous_start;
-
-        if self.selected_rank < start {
-            start = self.selected_rank;
-        } else if self.selected_rank >= start + visible_rows {
-            start = self
-                .selected_rank
-                .saturating_sub(visible_rows.saturating_sub(1));
-        }
-
-        start = start.min(max_start);
+        let previous_start = self.scroll_start_rank;
+        let start = super::state::scroll_start_for_selection(
+            self.selected_rank,
+            previous_start,
+            total_rows,
+            visible_rows,
+        );
         self.scroll_start_rank = start;
+        let did_scroll = start != previous_start;
 
-        if !force && start == previous_start {
-            Task::none()
-        } else {
+        if did_scroll && self.selected_rank != previous_rank {
+            self.highlighted_rank = previous_rank;
+            let revision = self.selection_revision;
             widget::operation::scroll_to(
                 self.results_scroll_id.clone(),
                 scrollable::AbsoluteOffset {
                     x: None,
-                    y: Some(start as f32 * RESULT_ROW_SCROLL_STEP),
+                    y: Some(start as f32 * self.layout.result_row_scroll_step()),
                 },
             )
+            .chain(Task::done(Message::SyncHighlightedRank {
+                revision,
+                rank: self.selected_rank,
+            }))
+        } else {
+            self.highlighted_rank = self.selected_rank;
+            if !force && !did_scroll {
+                Task::none()
+            } else {
+                widget::operation::scroll_to(
+                    self.results_scroll_id.clone(),
+                    scrollable::AbsoluteOffset {
+                        x: None,
+                        y: Some(start as f32 * self.layout.result_row_scroll_step()),
+                    },
+                )
+            }
         }
     }
 

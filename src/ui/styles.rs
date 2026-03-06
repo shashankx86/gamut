@@ -1,5 +1,5 @@
-use super::constants::{ITEM_RADIUS, PANEL_RADIUS};
 use super::launcher::Launcher;
+use super::layout::LauncherLayout;
 use iced::widget::{button, container, scrollable, text_input};
 use iced::{Background, Border, Color, Shadow, Theme};
 
@@ -14,7 +14,7 @@ pub(super) fn backdrop_style() -> container::Style {
     container::Style::default()
 }
 
-pub(super) fn panel_style() -> container::Style {
+pub(super) fn panel_style(layout: &LauncherLayout) -> container::Style {
     container::Style {
         text_color: Some(Color::from_rgb(0.92, 0.93, 0.95)),
         background: Some(Background::Color(Color::from_rgba(
@@ -26,7 +26,7 @@ pub(super) fn panel_style() -> container::Style {
         border: Border {
             color: Color::from_rgba(48.0 / 255.0, 49.0 / 255.0, 52.0 / 255.0, 0.95),
             width: 1.0,
-            radius: PANEL_RADIUS.into(),
+            radius: layout.panel_radius.into(),
         },
         shadow: Shadow::default(),
         ..container::Style::default()
@@ -78,7 +78,11 @@ pub(super) fn show_more_icon_style() -> container::Style {
     container::Style::default()
 }
 
-pub(super) fn result_button_style(status: button::Status, first_row: bool) -> button::Style {
+pub(super) fn result_button_style(
+    status: button::Status,
+    first_row: bool,
+    layout: &LauncherLayout,
+) -> button::Style {
     let active_bg = if first_row {
         Color::from_rgba(32.0 / 255.0, 32.0 / 255.0, 32.0 / 255.0, 0.92)
     } else {
@@ -109,7 +113,7 @@ pub(super) fn result_button_style(status: button::Status, first_row: bool) -> bu
         border: Border {
             color: Color::from_rgba(57.0 / 255.0, 57.0 / 255.0, 57.0 / 255.0, 0.56),
             width: if first_row { 1.0 } else { 0.0 },
-            radius: ITEM_RADIUS.into(),
+            radius: layout.item_radius.into(),
         },
         ..button::Style::default()
     }

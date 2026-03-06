@@ -1,5 +1,5 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
-use super::super::launcher_surface_settings;
+use super::super::surface::{launcher_hidden_surface_settings, launcher_visible_surface_settings};
 use super::{Launcher, Message};
 use iced::{Task, window};
 use std::process::Command;
@@ -57,7 +57,14 @@ impl Launcher {
             tasks.push(Task::done(Message::RemoveWindow(id)));
         }
         tasks.push(Task::done(Message::NewLayerShell {
-            settings: launcher_surface_settings(),
+            settings: if self.is_visible {
+                launcher_visible_surface_settings(
+                    &self.layout,
+                    self.results_progress > 0.0 || self.results_target > 0.0,
+                )
+            } else {
+                launcher_hidden_surface_settings(&self.layout)
+            },
             id: new_window_id,
         }));
 

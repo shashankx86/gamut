@@ -1,13 +1,16 @@
 mod actions;
+mod state;
 mod subscription;
 mod update;
 
-use super::constants::{MAX_RESULTS, RESULTS_ANIMATION_SPEED};
-use super::launcher_hidden_surface_settings;
+use super::constants::MAX_RESULTS;
+use super::layout::{LauncherLayout, LauncherPreferences};
+use super::surface::launcher_hidden_surface_settings;
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
 };
 use crate::core::ipc::{IpcCommand, start_listener};
+use iced::Size;
 use iced::widget;
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
@@ -42,6 +45,7 @@ impl Hash for IpcReceiverHandle {
 
 pub(super) struct Launcher {
     pub(super) apps: Vec<DesktopApp>,
+    pub(super) layout: LauncherLayout,
     pub(super) query: String,
     pub(super) normalized_query: String,
     pub(super) input_id: widget::Id,
@@ -50,11 +54,14 @@ pub(super) struct Launcher {
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
+    pub(super) highlighted_rank: usize,
+    selection_revision: u64,
     pub(super) scroll_start_rank: usize,
     pub(super) filtered_indices: Vec<usize>,
     pub(super) results_progress: f32,
     pub(super) results_target: f32,
     pub(super) manually_expanded: bool,
+    layout_preferences: LauncherPreferences,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
 }
@@ -74,10 +81,14 @@ pub(super) enum Message {
     WindowOpened(window::Id),
     WindowClosed(window::Id),
     FatalError(String),
+    MonitorSizeLoaded(Option<Size>),
+    SyncHighlightedRank { revision: u64, rank: usize },
 }
 
 impl Launcher {
     pub(super) fn new() -> (Self, Task<Message>) {
+        let layout_preferences = LauncherPreferences::load_from_env();
+        let layout = LauncherLayout::from_monitor_size(None, &layout_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
         let hidden_window_id = window::Id::unique();
@@ -87,7 +98,7 @@ impl Launcher {
                 IpcReceiverHandle::new(receiver),
                 Task::batch(vec![
                     Task::done(Message::NewLayerShell {
-                        settings: launcher_hidden_surface_settings(),
+                        settings: launcher_hidden_surface_settings(&layout),
                         id: hidden_window_id,
                     }),
                     Task::perform(async { load_apps() }, Message::AppsLoaded),
@@ -107,6 +118,7 @@ impl Launcher {
         (
             Self {
                 apps: Vec::new(),
+                layout,
                 query: String::new(),
                 normalized_query: String::new(),
                 input_id,
@@ -115,11 +127,14 @@ impl Launcher {
                 is_visible: false,
                 ignore_unfocus_until: None,
                 selected_rank: 0,
+                highlighted_rank: 0,
+                selection_revision: 0,
                 scroll_start_rank: 0,
                 filtered_indices: Vec::new(),
                 results_progress: 0.0,
                 results_target: 0.0,
                 manually_expanded: false,
+                layout_preferences,
                 icon_resolve_in_flight: false,
                 ipc_handle,
             },
@@ -182,9 +197,11 @@ impl Launcher {
     fn clear_window_state(&mut self) {
         self.query.clear();
         self.normalized_query.clear();
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.refresh_filtered_indices();
         self.ignore_unfocus_until = None;
         self.selected_rank = 0;
+        self.highlighted_rank = 0;
         self.scroll_start_rank = 0;
         self.results_progress = 0.0;
         self.results_target = 0.0;
@@ -197,48 +214,29 @@ impl Launcher {
     }
 
     pub(super) fn sync_results_target_with_query(&mut self) {
-        self.results_target = if self.normalized_query.is_empty() && !self.manually_expanded {
-            0.0
-        } else {
-            1.0
-        };
+        self.results_target =
+            state::results_target(self.normalized_query.is_empty(), self.manually_expanded);
     }
 
     pub(super) fn animate_results(&mut self) -> Task<Message> {
-        let delta = self.results_target - self.results_progress;
-        let mut task = Task::none();
-        
-        // Expand the layer shell window immediately when starting to show results,
-        // so the UI animation can play fluidly inside the larger compositor bounds.
-        if self.results_progress == 0.0 && self.results_target > 0.0 {
-            if let Some(id) = self.window_id {
-                let max_h = 103.0 + crate::ui::constants::RESULTS_HEIGHT;
-                task = Task::done(Message::SizeChange {
-                    id,
-                    size: (crate::ui::constants::PANEL_WIDTH as u32, max_h as u32),
-                });
-            }
-        }
+        let step = state::animate_results(self.results_progress, self.results_target, &self.layout);
+        self.results_progress = step.next_progress;
 
-        let needs_snap = delta.abs() < 0.01;
-        if needs_snap {
-            self.results_progress = self.results_target;
-            
-            // Shrink the layer shell window after the collapse animation fully completes,
-            // restoring the ability to click through the transparent area below.
-            if self.results_progress == 0.0 {
-                if let Some(id) = self.window_id {
-                    task = Task::done(Message::SizeChange {
-                        id,
-                        size: (crate::ui::constants::PANEL_WIDTH as u32, 103),
-                    });
-                }
-            }
-        } else {
-            self.results_progress = (self.results_progress + delta * RESULTS_ANIMATION_SPEED).clamp(0.0, 1.0);
+        let Some(id) = self.window_id else {
+            return Task::none();
+        };
+
+        match step.surface_resize {
+            state::SurfaceResize::None => Task::none(),
+            state::SurfaceResize::Expanded => Task::done(Message::SizeChange {
+                id,
+                size: self.layout.expanded_surface_size(),
+            }),
+            state::SurfaceResize::Collapsed => Task::done(Message::SizeChange {
+                id,
+                size: self.layout.collapsed_surface_size(),
+            }),
         }
-            
-        task
     }
 
     pub(super) fn selected_result_index(&self) -> Option<usize> {
@@ -255,28 +253,26 @@ impl Launcher {
     }
 
     pub(super) fn move_selection(&mut self, offset: isize) {
-        let count = self.filtered_indices.len();
-        if count == 0 {
-            self.selected_rank = 0;
-            return;
-        }
-
-        let current = self.selected_rank.min(count.saturating_sub(1)) as isize;
-        self.selected_rank = (current + offset).clamp(0, count as isize - 1) as usize;
+        self.selected_rank =
+            state::move_selection(self.selected_rank, self.filtered_indices.len(), offset);
     }
 
     pub(super) fn update_query(&mut self, query: String) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.query = query;
         self.normalized_query = normalize_query(&self.query);
         self.refresh_filtered_indices();
         self.sync_results_target_with_query();
         self.selected_rank = 0;
+        self.highlighted_rank = 0;
         self.scroll_start_rank = 0;
     }
 
     pub(super) fn set_apps(&mut self, apps: Vec<DesktopApp>) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.apps = apps;
         self.selected_rank = 0;
+        self.highlighted_rank = 0;
         self.scroll_start_rank = 0;
         self.refresh_filtered_indices();
     }
@@ -329,5 +325,52 @@ impl Launcher {
 
     pub(super) fn ipc_handle(&self) -> IpcReceiverHandle {
         self.ipc_handle.clone()
+    }
+
+    pub(super) fn update_layout(&mut self, monitor_size: Option<Size>) -> Task<Message> {
+        let previous_layout = self.layout.clone();
+        self.layout = LauncherLayout::from_monitor_size(monitor_size, &self.layout_preferences);
+
+        if !self.is_visible {
+            return Task::none();
+        }
+
+        if self.layout.should_recreate_surface(&previous_layout) {
+            return self.recreate_launcher_surface();
+        }
+
+        let Some(id) = self.window_id else {
+            return Task::none();
+        };
+
+        let size = if self.results_progress > 0.0 || self.results_target > 0.0 {
+            self.layout.expanded_surface_size()
+        } else {
+            self.layout.collapsed_surface_size()
+        };
+
+        if size
+            != if self.results_progress > 0.0 || self.results_target > 0.0 {
+                previous_layout.expanded_surface_size()
+            } else {
+                previous_layout.collapsed_surface_size()
+            }
+        {
+            Task::done(Message::SizeChange { id, size })
+        } else {
+            Task::none()
+        }
+    }
+
+    pub(super) fn sync_highlighted_rank(&mut self, revision: u64, rank: usize) {
+        if revision != self.selection_revision {
+            return;
+        }
+
+        self.highlighted_rank = if self.filtered_indices.is_empty() {
+            0
+        } else {
+            rank.min(self.filtered_indices.len().saturating_sub(1))
+        };
     }
 }

@@ -1,15 +1,11 @@
-use super::constants::{
-    PANEL_WIDTH, RESULT_ICON_BOX_SIZE, RESULT_ICON_SIZE, RESULT_ROW_GAP, RESULT_ROW_HEIGHT,
-    RESULTS_HEIGHT, RESULTS_SIDE_PADDING, SEARCH_ICON_SIZE,
-};
 use super::launcher::{Launcher, Message};
 use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style, show_more_icon_style,
 };
 use crate::core::desktop::{DesktopApp, trim_label};
-use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
 use iced::widget::svg::Handle as SvgHandle;
+use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
 use iced::{Color, ContentFit, Element, Length, window};
 
 const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
@@ -46,15 +42,18 @@ impl Launcher {
 
         let launcher_panel = container(content)
             .padding(0)
-            .style(|_| panel_style())
+            .style(|_| panel_style(&self.layout))
             .width(Length::Fill)
-            .max_width(PANEL_WIDTH as u32)
+            .max_width(self.layout.panel_width as u32)
             .height(Length::Shrink);
 
         container(launcher_panel)
             .width(Length::Fill)
             .height(Length::Fill)
-            .padding([8, 24])
+            .padding([
+                self.layout.outer_padding_y as u16,
+                self.layout.outer_padding_x as u16,
+            ])
             .align_x(iced::alignment::Horizontal::Center)
             .align_y(iced::alignment::Vertical::Top)
             .style(|_| backdrop_style())
@@ -66,34 +65,36 @@ impl Launcher {
             .id(self.input_id.clone())
             .on_input(Message::QueryChanged)
             .on_submit(Message::LaunchFirstMatch)
-            .padding([11, 0])
-            .size(20)
+            .padding([self.layout.search_input_padding_y as u16, 0])
+            .size(self.layout.search_input_font_size)
             .style(search_input_style)
             .width(Length::Fill);
 
         row![
             svg(SvgHandle::from_memory(SEARCH_ICON_SVG))
-                .width(Length::Fixed(SEARCH_ICON_SIZE))
-                .height(Length::Fixed(SEARCH_ICON_SIZE)),
+                .width(Length::Fixed(self.layout.search_icon_size))
+                .height(Length::Fixed(self.layout.search_icon_size)),
             input,
         ]
         .width(Length::Fill)
-        .height(Length::Fixed(55.0))
-        .padding([0, 20])
-        .spacing(10)
+        .height(Length::Fixed(self.layout.search_row_height))
+        .padding([0, self.layout.search_row_padding_x as u16])
+        .spacing(self.layout.search_row_gap)
         .align_y(iced::alignment::Vertical::Center)
         .into()
     }
 
     fn view_results_section(&self, progress: f32) -> Element<'_, Message> {
-        let mut results = column![].spacing(RESULT_ROW_GAP).width(Length::Fill);
+        let mut results = column![]
+            .spacing(self.layout.result_row_gap)
+            .width(Length::Fill);
         let filtered = self.filtered_indices();
 
         if filtered.is_empty() {
             results = results.push(
                 container(
                     text("No applications found")
-                        .size(14)
+                        .size(self.layout.empty_state_text_size)
                         .color(Color::from_rgb(0.62, 0.64, 0.67)),
                 )
                 .width(Length::Fill)
@@ -103,7 +104,7 @@ impl Launcher {
             );
         } else {
             for (rank, index) in filtered.iter().copied().enumerate() {
-                results = results.push(self.view_result_row(index, rank == self.selected_rank));
+                results = results.push(self.view_result_row(index, rank == self.highlighted_rank));
             }
         }
 
@@ -120,8 +121,11 @@ impl Launcher {
 
         container(list)
             .width(Length::Fill)
-            .height(Length::Fixed(RESULTS_HEIGHT * progress))
-            .padding([6, RESULTS_SIDE_PADDING])
+            .height(Length::Fixed(self.layout.results_height * progress))
+            .padding([
+                self.layout.results_top_bottom_padding as u16,
+                self.layout.results_side_padding as u16,
+            ])
             .into()
     }
 
@@ -129,16 +133,16 @@ impl Launcher {
         let app = &self.apps[index];
 
         let left = row![
-            container(self.view_app_icon(app, RESULT_ICON_SIZE))
-                .width(Length::Fixed(RESULT_ICON_BOX_SIZE))
-                .height(Length::Fixed(RESULT_ICON_BOX_SIZE))
+            container(self.view_app_icon(app, self.layout.result_icon_size))
+                .width(Length::Fixed(self.layout.result_icon_box_size))
+                .height(Length::Fixed(self.layout.result_icon_box_size))
                 .padding([0, 3]),
             column![
                 text(&app.name)
-                    .size(14)
+                    .size(self.layout.result_primary_text_size)
                     .color(Color::from_rgb(0.92, 0.93, 0.95)),
-                text(trim_label(&app.exec_line, 56))
-                    .size(12)
+                text(trim_label(&app.exec_line, self.layout.result_label_max_len))
+                    .size(self.layout.result_secondary_text_size)
                     .color(Color::from_rgb(0.55, 0.58, 0.61)),
             ]
             .spacing(1)
@@ -152,8 +156,8 @@ impl Launcher {
             .on_press(Message::LaunchIndex(index))
             .padding([5, 10])
             .width(Length::Fill)
-            .height(Length::Fixed(RESULT_ROW_HEIGHT))
-            .style(move |_theme, status| result_button_style(status, first_row))
+            .height(Length::Fixed(self.layout.result_row_height))
+            .style(move |_theme, status| result_button_style(status, first_row, &self.layout))
             .into()
     }
 
@@ -165,9 +169,11 @@ impl Launcher {
         };
 
         let logo = container(
-            svg(SvgHandle::from_memory(include_bytes!("../../assets/icons/gamut-full-transparent-dark.svg")))
-                .width(Length::Fixed(66.0))
-                .height(Length::Fixed(14.0))
+            svg(SvgHandle::from_memory(include_bytes!(
+                "../../assets/icons/gamut-full-transparent-dark.svg"
+            )))
+            .width(Length::Fixed(self.layout.logo_width))
+            .height(Length::Fixed(self.layout.logo_height)),
         )
         .padding([0, 4])
         .center_y(Length::Fill);
@@ -175,38 +181,34 @@ impl Launcher {
         let show_more = container(
             row![
                 text(label_text)
-                    .size(14)
+                    .size(self.layout.result_primary_text_size)
                     .color(Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0)),
                 container(
                     svg(SvgHandle::from_memory(icon_svg))
-                        .width(Length::Fixed(22.0))
-                        .height(Length::Fixed(22.0))
+                        .width(Length::Fixed(self.layout.action_icon_size))
+                        .height(Length::Fixed(self.layout.action_icon_size))
                 )
-                .width(Length::Fixed(22.0))
-                .height(Length::Fixed(22.0))
+                .width(Length::Fixed(self.layout.action_icon_size))
+                .height(Length::Fixed(self.layout.action_icon_size))
                 .center_x(Length::Shrink)
                 .center_y(Length::Shrink)
                 .style(|_| show_more_icon_style()),
             ]
             .align_y(iced::alignment::Vertical::Center)
-            .spacing(6),
+            .spacing(self.layout.bottom_strip_label_gap),
         )
         .height(Length::Fill)
         .center_y(Length::Fill);
 
         container(
-            row![
-                logo,
-                container("").width(Length::Fill),
-                show_more,
-            ]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_y(iced::alignment::Vertical::Center)
-            .spacing(0),
+            row![logo, container("").width(Length::Fill), show_more,]
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_y(iced::alignment::Vertical::Center)
+                .spacing(0),
         )
-        .height(Length::Fixed(31.0))
-        .padding([0, 8])
+        .height(Length::Fixed(self.layout.bottom_strip_height))
+        .padding([0, self.layout.bottom_strip_padding_x as u16])
         .style(|_| bottom_strip_style())
         .into()
     }
