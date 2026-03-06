@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -24,73 +26,185 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  test:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Checkout specific commit
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
-        run: git checkout ${{ github.event.inputs.commit }}
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
-      - name: Run tests
-        run: cargo test --release
-      - name: Build
-        run: cargo build --release
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: gamut-binary
-          path: target/release/gamut
+          sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
+            libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
+      - run: rustup toolchain install stable --profile minimal
+      - run: cargo test --release
 
-  release:
-    needs: build
-    runs-on: ubuntu-20.04
-    if: ${{ success() }}
+  prepare:
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.info.outputs.version }}
+      tag: ${{ steps.info.outputs.tag }}
+      title: ${{ steps.info.outputs.title }}
+      prerelease: ${{ steps.info.outputs.prerelease }}
+      commit: ${{ steps.info.outputs.commit }}
+      is_push_main: ${{ steps.info.outputs.is_push_main }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Checkout specific commit
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.commit != '' }}
-        run: git checkout ${{ github.event.inputs.commit }}
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: gamut-binary
-          path: target/release/
-      - name: Determine release info
-        id: vars
+      - name: Determine build info
+        id: info
         run: |
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            # Manual trigger
             TAG="${{ github.event.inputs.tag }}"
-            if [ -z "$TAG" ]; then
-              echo "tag input is required" >&2
-              exit 1
-            fi
             TITLE="${{ github.event.inputs.release_title }}"
             if [ -z "$TITLE" ]; then
               TITLE="$TAG"
             fi
             PRERELEASE="${{ github.event.inputs.prerelease }}"
-          else
-            TAG="pre-${GITHUB_SHA}"
+            COMMIT="${{ github.event.inputs.commit }}"
+            VERSION="${TAG#v}"
+            IS_PUSH_MAIN="false"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Tag push
+            TAG="${{ github.ref_name }}"
             TITLE="$TAG"
-            PRERELEASE=true
+            PRERELEASE="false"
+            COMMIT=""
+            VERSION="${TAG#v}"
+            IS_PUSH_MAIN="false"
+          else
+            # Push to main - create dev version
+            CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            TAG="v${CURRENT_VERSION}-dev.${SHORT_SHA}"
+            TITLE="$TAG"
+            PRERELEASE="true"
+            COMMIT=""
+            VERSION="${CURRENT_VERSION}-dev.${SHORT_SHA}"
+            IS_PUSH_MAIN="true"
           fi
-          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          echo "RELEASE_TITLE=$TITLE" >> "$GITHUB_ENV"
-          echo "RELEASE_PRERELEASE=$PRERELEASE" >> "$GITHUB_ENV"
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v1
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          echo "is_push_main=$IS_PUSH_MAIN" >> "$GITHUB_OUTPUT"
+      - name: Checkout specific commit
+        if: ${{ steps.info.outputs.commit != '' }}
+        run: git checkout ${{ steps.info.outputs.commit }}
+      - name: Update Cargo.toml version for dev builds
+        if: ${{ steps.info.outputs.is_push_main == 'true' }}
+        run: |
+          sed -i 's/^version = "[^"]*"/version = "${{ steps.info.outputs.version }}"/' Cargo.toml
+
+  validate:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: ${{ env.RELEASE_TITLE }}
-          prerelease: ${{ env.RELEASE_PRERELEASE }}
-          files: |
-            target/release/gamut*
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ needs.prepare.outputs.commit != '' }}
+        run: git checkout ${{ needs.prepare.outputs.commit }}
+      - name: Update Cargo.toml version for dev builds
+        if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
+        run: |
+          sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+      - uses: michaelklishin/rust-build-package-release-action@v1
+        id: validate
+        with:
+          command: validate-version
+          expected-version: ${{ needs.prepare.outputs.tag }}
+
+  build:
+    needs: [prepare, validate]
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ needs.prepare.outputs.commit != '' }}
+        run: git checkout ${{ needs.prepare.outputs.commit }}
+      - name: Update Cargo.toml version for dev builds
+        if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
+        run: |
+          sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+      - run: rustup toolchain install stable --profile minimal
+      - uses: michaelklishin/rust-build-package-release-action@v1
+        id: build
+        with:
+          command: release-linux
+          target: ${{ matrix.target }}
+          locked: 'true'
+          archive: 'true'
+          pre-build: |
+            sudo apt-get update && \
+            sudo apt-get install -y libglib2.0-dev libgtk-3-dev libatk1.0-dev \
+              libgdk-pixbuf2.0-dev libcairo2-dev libpango1.0-dev libwayland-dev pkg-config
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/*.tar.gz
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Checkout specific commit
+        if: ${{ needs.prepare.outputs.commit != '' }}
+        run: git checkout ${{ needs.prepare.outputs.commit }}
+      - name: Update Cargo.toml version for dev builds
+        if: ${{ needs.prepare.outputs.is_push_main == 'true' }}
+        run: |
+          sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
+      - uses: michaelklishin/rust-build-package-release-action@v1
+        with:
+          command: extract-changelog
+          version: ${{ needs.prepare.outputs.version }}
+        continue-on-error: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -name '*.tar.gz' -exec cp {} release/ \;
+          find artifacts -type f -name '*.sha256' -exec cp {} release/ \;
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.title }}
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
+          body_path: ${{ github.workspace }}/release_notes.md
+          files: release/*
+        continue-on-error: true
+      - name: Create GitHub release (no changelog)
+        if: failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.title }}
+          prerelease: ${{ needs.prepare.outputs.prerelease }}
+          files: release/*
