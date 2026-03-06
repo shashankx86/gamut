@@ -136,6 +136,8 @@ impl Launcher {
             container(self.view_app_icon(app, self.layout.result_icon_size))
                 .width(Length::Fixed(self.layout.result_icon_box_size))
                 .height(Length::Fixed(self.layout.result_icon_box_size))
+                .align_x(iced::alignment::Horizontal::Center)
+                .align_y(iced::alignment::Vertical::Center)
                 .padding([0, 3]),
             column![
                 text(&app.name)
@@ -150,11 +152,12 @@ impl Launcher {
         ]
         .spacing(10)
         .align_y(iced::alignment::Vertical::Center)
-        .width(Length::Fill);
+        .width(Length::Fill)
+        .height(Length::Fill);
 
         button(left)
             .on_press(Message::LaunchIndex(index))
-            .padding([5, 10])
+            .padding([0, 10])
             .width(Length::Fill)
             .height(Length::Fixed(self.layout.result_row_height))
             .style(move |_theme, status| result_button_style(status, first_row, &self.layout))
