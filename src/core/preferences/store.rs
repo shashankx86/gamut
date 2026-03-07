@@ -51,7 +51,7 @@ fn config_home_dir() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::{
-        load_preferences_from_path, preferences_path, save_preferences_to_path, AppPreferences,
+        AppPreferences, load_preferences_from_path, preferences_path, save_preferences_to_path,
     };
     use std::fs;
     use std::path::PathBuf;

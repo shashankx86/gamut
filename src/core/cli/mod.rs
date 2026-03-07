@@ -1,13 +1,13 @@
 mod command;
 mod output;
 
-pub use command::{parse_command, CliCommand, CliMode};
+pub use command::{CliCommand, CliMode, parse_command};
 pub use output::{print_help, print_version};
 
 #[cfg(test)]
 mod tests {
     use super::output::{help_text, version_text};
-    use super::{parse_command, CliCommand, CliMode};
+    use super::{CliCommand, CliMode, parse_command};
     use std::ffi::OsString;
 
     #[test]
