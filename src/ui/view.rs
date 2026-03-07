@@ -14,6 +14,8 @@ const ENTER_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 2
 
 impl Launcher {
     pub(super) fn view(&self, _window: window::Id) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+
         if !self.is_visible {
             return container("")
                 .width(Length::Fill)
@@ -36,13 +38,13 @@ impl Launcher {
                 container("")
                     .height(1)
                     .width(Length::Fill)
-                    .style(|_| divider_style()),
+                    .style(move |_| divider_style(&appearance)),
             )
             .push(self.view_bottom_strip());
 
         let launcher_panel = container(content)
             .padding(0)
-            .style(|_| panel_style(&self.layout))
+            .style(move |_| panel_style(&self.layout, &appearance))
             .width(Length::Fill)
             .max_width(self.layout.panel_width as u32)
             .height(Length::Shrink);
@@ -61,13 +63,14 @@ impl Launcher {
     }
 
     fn view_search_header(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
         let input = text_input("Search for apps and commands...", &self.query)
             .id(self.input_id.clone())
             .on_input(Message::QueryChanged)
             .on_submit(Message::LaunchFirstMatch)
             .padding([self.layout.search_input_padding_y as u16, 0])
             .size(self.layout.search_input_font_size)
-            .style(search_input_style)
+            .style(move |_theme, status| search_input_style(&appearance, status))
             .width(Length::Fill);
 
         row![
@@ -85,6 +88,7 @@ impl Launcher {
     }
 
     fn view_results_section(&self, progress: f32) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
         let mut results = column![]
             .spacing(self.layout.result_row_gap)
             .width(Length::Fill);
@@ -143,7 +147,7 @@ impl Launcher {
                     .scroller_width(6)
                     .spacing(4),
             ))
-            .style(results_scroll_style);
+            .style(move |theme, status| results_scroll_style(theme, &appearance, status));
 
         container(list)
             .width(Length::Fill)
@@ -156,6 +160,7 @@ impl Launcher {
     }
 
     fn view_result_row(&self, index: usize, first_row: bool) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
         let app = &self.apps[index];
 
         let left = row![
@@ -168,10 +173,10 @@ impl Launcher {
             column![
                 text(&app.name)
                     .size(self.layout.result_primary_text_size)
-                    .color(Color::from_rgb(0.92, 0.93, 0.95)),
+                    .color(appearance.primary_text),
                 text(trim_label(&app.exec_line, self.layout.result_label_max_len))
                     .size(self.layout.result_secondary_text_size)
-                    .color(Color::from_rgb(0.55, 0.58, 0.61)),
+                    .color(appearance.secondary_text),
             ]
             .spacing(1)
             .width(Length::Fill),
@@ -186,11 +191,14 @@ impl Launcher {
             .padding([0, 10])
             .width(Length::Fill)
             .height(Length::Fixed(self.layout.result_row_height))
-            .style(move |_theme, status| result_button_style(status, first_row, &self.layout))
+            .style(move |_theme, status| {
+                result_button_style(status, first_row, &self.layout, &appearance)
+            })
             .into()
     }
 
     fn view_bottom_strip(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
         let (label_text, icon_svg) = if self.query.is_empty() && self.results_target == 0.0 {
             ("Show more", SHOW_MORE_ICON_SVG)
         } else {
@@ -211,7 +219,7 @@ impl Launcher {
             row![
                 text(label_text)
                     .size(self.layout.result_primary_text_size)
-                    .color(Color::from_rgb(131.0 / 255.0, 135.0 / 255.0, 143.0 / 255.0)),
+                    .color(appearance.muted_text),
                 container(
                     svg(SvgHandle::from_memory(icon_svg))
                         .width(Length::Fixed(self.layout.action_icon_size))
@@ -238,7 +246,7 @@ impl Launcher {
         )
         .height(Length::Fixed(self.layout.bottom_strip_height))
         .padding([0, self.layout.bottom_strip_padding_x as u16])
-        .style(|_| bottom_strip_style())
+        .style(move |_| bottom_strip_style(&appearance))
         .into()
     }
 
@@ -272,7 +280,7 @@ impl Launcher {
 
         text(fallback)
             .size(12)
-            .color(Color::from_rgb(0.88, 0.90, 0.94))
+            .color(self.resolved_appearance().primary_text)
             .into()
     }
 

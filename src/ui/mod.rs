@@ -3,6 +3,7 @@ mod launcher;
 mod layout;
 mod styles;
 mod surface;
+mod theme;
 mod view;
 
 use iced::Theme;
@@ -22,6 +23,7 @@ pub fn run_daemon() -> Result<(), DynError> {
         Launcher::update,
         Launcher::view,
     )
+    .title(launcher_title)
     .subscription(Launcher::subscription)
     .theme(launcher_theme)
     .style(launcher_base_style)
@@ -34,7 +36,11 @@ pub fn run_daemon() -> Result<(), DynError> {
 }
 
 fn launcher_theme(_state: &Launcher, _id: window::Id) -> Theme {
-    Theme::Dark
+    _state.window_theme()
+}
+
+fn launcher_title(state: &Launcher, id: window::Id) -> Option<String> {
+    state.window_title(id)
 }
 
 fn daemon_layer_settings() -> LayerShellSettings {

@@ -6,6 +6,8 @@ mod update;
 use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
 use super::surface::launcher_hidden_surface_settings;
+use super::theme::{ResolvedAppearance, resolve_appearance, resolve_theme};
+use crate::core::preferences::{AppPreferences, load_preferences};
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
 };
@@ -55,6 +57,7 @@ pub(super) struct Launcher {
     pub(super) input_id: widget::Id,
     pub(super) results_scroll_id: widget::Id,
     pub(super) window_id: Option<window::Id>,
+    pub(super) monitor_size: Option<Size>,
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
@@ -66,6 +69,7 @@ pub(super) struct Launcher {
     pub(super) results_target: f32,
     pub(super) manually_expanded: bool,
     layout_preferences: LauncherPreferences,
+    pub(super) app_preferences: AppPreferences,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
 }
@@ -92,7 +96,8 @@ pub(super) enum Message {
 impl Launcher {
     pub(super) fn new() -> (Self, Task<Message>) {
         let layout_preferences = LauncherPreferences::load_from_env();
-        let layout = LauncherLayout::from_monitor_size(None, &layout_preferences);
+        let app_preferences = load_preferences();
+        let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
         let hidden_window_id = window::Id::unique();
@@ -128,6 +133,7 @@ impl Launcher {
                 input_id,
                 results_scroll_id,
                 window_id: Some(hidden_window_id),
+                monitor_size: None,
                 is_visible: false,
                 ignore_unfocus_until: None,
                 selected_rank: 0,
@@ -139,6 +145,7 @@ impl Launcher {
                 results_target: 0.0,
                 manually_expanded: false,
                 layout_preferences,
+                app_preferences,
                 icon_resolve_in_flight: false,
                 ipc_handle,
             },
@@ -332,8 +339,13 @@ impl Launcher {
     }
 
     pub(super) fn update_layout(&mut self, monitor_size: Option<Size>) -> Task<Message> {
+        self.monitor_size = monitor_size;
         let previous_layout = self.layout.clone();
-        self.layout = LauncherLayout::from_monitor_size(monitor_size, &self.layout_preferences);
+        self.layout = LauncherLayout::from_monitor_size(
+            self.monitor_size,
+            &self.layout_preferences,
+            &self.app_preferences,
+        );
 
         if !self.is_visible {
             return Task::none();
@@ -376,5 +388,22 @@ impl Launcher {
         } else {
             rank.min(self.filtered_indices.len().saturating_sub(1))
         };
+    }
+
+    pub(super) fn reload_preferences_from_disk(&mut self) -> Task<Message> {
+        self.app_preferences = load_preferences();
+        self.update_layout(self.monitor_size)
+    }
+
+    pub(super) fn resolved_appearance(&self) -> ResolvedAppearance {
+        resolve_appearance(&self.app_preferences.appearance)
+    }
+
+    pub(super) fn window_theme(&self) -> iced::Theme {
+        resolve_theme(&self.app_preferences.appearance)
+    }
+
+    pub(super) fn window_title(&self, _id: window::Id) -> Option<String> {
+        Some("Gamut".to_string())
     }
 }

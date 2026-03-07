@@ -1,4 +1,5 @@
 use super::LauncherPreferences;
+use crate::core::preferences::{AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference};
 use iced::Size;
 
 const REFERENCE_MONITOR_WIDTH: f32 = 1920.0;
@@ -83,14 +84,19 @@ pub(in crate::ui) struct LauncherLayout {
 impl LauncherLayout {
     #[cfg(test)]
     pub(in crate::ui) fn fallback() -> Self {
-        Self::from_monitor_size(None, &LauncherPreferences::default())
+        Self::from_monitor_size(
+            None,
+            &LauncherPreferences::default(),
+            &AppPreferences::default(),
+        )
     }
 
     pub(in crate::ui) fn from_monitor_size(
         monitor_size: Option<Size>,
         preferences: &LauncherPreferences,
+        app_preferences: &AppPreferences,
     ) -> Self {
-        let scale = layout_scale_for(monitor_size);
+        let scale = layout_scale_for(monitor_size) * size_scale(app_preferences.layout.size);
         let mut layout = Self {
             panel_width: scaled(DEFAULT_PANEL_WIDTH, scale),
             panel_radius: scaled(DEFAULT_PANEL_RADIUS, scale),
@@ -142,6 +148,9 @@ impl LauncherLayout {
             layout.results_animation_speed = animation_speed;
         }
 
+        apply_radius_preferences(&mut layout, app_preferences);
+        apply_placement_preferences(&mut layout, monitor_size, preferences, app_preferences);
+
         layout
     }
 
@@ -187,6 +196,60 @@ impl LauncherLayout {
     pub(in crate::ui) fn should_recreate_surface(&self, previous: &Self) -> bool {
         self.top_margin != previous.top_margin
     }
+}
+
+fn size_scale(size: LauncherSize) -> f32 {
+    match size {
+        LauncherSize::Small => 0.88,
+        LauncherSize::Medium => 1.0,
+        LauncherSize::Large => 1.12,
+        LauncherSize::ExtraLarge => 1.26,
+    }
+}
+
+fn apply_radius_preferences(layout: &mut LauncherLayout, app_preferences: &AppPreferences) {
+    let custom = app_preferences.appearance.custom_radius.max(0.0);
+    let panel_radius = match app_preferences.appearance.radius {
+        RadiusPreference::Small => DEFAULT_PANEL_RADIUS,
+        RadiusPreference::Medium => 16.0,
+        RadiusPreference::Large => 22.0,
+        RadiusPreference::Custom => custom,
+    };
+    let item_radius = match app_preferences.appearance.radius {
+        RadiusPreference::Small => DEFAULT_ITEM_RADIUS,
+        RadiusPreference::Medium => 12.0,
+        RadiusPreference::Large => 16.0,
+        RadiusPreference::Custom => (custom * 0.8).max(0.0),
+    };
+
+    layout.panel_radius = panel_radius;
+    layout.item_radius = item_radius;
+}
+
+fn apply_placement_preferences(
+    layout: &mut LauncherLayout,
+    monitor_size: Option<Size>,
+    preferences: &LauncherPreferences,
+    app_preferences: &AppPreferences,
+) {
+    if preferences.top_margin.is_some() {
+        return;
+    }
+
+    layout.top_margin = match app_preferences.layout.placement {
+        LauncherPlacement::RaisedCenter => layout.top_margin,
+        LauncherPlacement::Custom => round_to_i32(app_preferences.layout.custom_top_margin),
+        LauncherPlacement::Center => centered_top_margin(layout, monitor_size),
+    };
+}
+
+fn centered_top_margin(layout: &LauncherLayout, monitor_size: Option<Size>) -> i32 {
+    let Some(size) = monitor_size else {
+        return layout.top_margin;
+    };
+
+    let centered = ((size.height - layout.expanded_surface_height() as f32) / 2.0).max(0.0);
+    round_to_i32(centered)
 }
 
 fn layout_scale_for(monitor_size: Option<Size>) -> f32 {
