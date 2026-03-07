@@ -3,10 +3,10 @@ use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style, show_more_icon_style,
 };
-use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::desktop::{trim_label, DesktopApp};
 use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{Color, ContentFit, Element, Length, window};
+use iced::{window, Color, ContentFit, Element, Length};
 
 const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
@@ -103,8 +103,34 @@ impl Launcher {
                 .center_y(Length::Fill),
             );
         } else {
-            for (rank, index) in filtered.iter().copied().enumerate() {
+            let render_range = self.result_render_range();
+            let row_step = self.layout.result_row_scroll_step();
+            let visible_start = render_range.start;
+            let visible_end = render_range.end;
+
+            if visible_start > 0 {
+                results = results.push(
+                    container("")
+                        .width(Length::Fill)
+                        .height(Length::Fixed(self.results_top_spacer_height())),
+                );
+            }
+
+            for (rank, index) in filtered
+                .iter()
+                .copied()
+                .enumerate()
+                .skip(visible_start)
+                .take(visible_end.saturating_sub(visible_start))
+            {
                 results = results.push(self.view_result_row(index, rank == self.highlighted_rank));
+            }
+
+            let trailing_rows = filtered.len().saturating_sub(visible_end);
+            if trailing_rows > 0 {
+                results = results.push(container("").width(Length::Fill).height(Length::Fixed(
+                    super::launcher::spacer_height_for_rows(trailing_rows, row_step),
+                )));
             }
         }
 
@@ -248,5 +274,35 @@ impl Launcher {
             .size(12)
             .color(Color::from_rgb(0.88, 0.90, 0.94))
             .into()
+    }
+
+    fn result_render_range(&self) -> std::ops::Range<usize> {
+        let filtered = self.filtered_indices();
+
+        if filtered.is_empty() {
+            return 0..0;
+        }
+
+        if super::launcher::is_manual_expansion_in_progress(
+            self.normalized_query.is_empty(),
+            self.manually_expanded,
+            self.results_progress,
+            self.results_target,
+        ) {
+            return super::launcher::expansion_render_range(
+                self.scroll_start_rank,
+                filtered.len(),
+                self.layout.visible_result_rows(),
+            );
+        }
+
+        0..filtered.len()
+    }
+
+    fn results_top_spacer_height(&self) -> f32 {
+        super::launcher::spacer_height_for_rows(
+            self.result_render_range().start,
+            self.layout.result_row_scroll_step(),
+        )
     }
 }

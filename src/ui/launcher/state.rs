@@ -1,6 +1,8 @@
 use crate::ui::layout::LauncherLayout;
+use std::ops::Range;
 
 const SNAP_THRESHOLD: f32 = 0.01;
+const EXPANSION_RENDER_BUFFER_ROWS: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum SurfaceResize {
@@ -51,6 +53,37 @@ pub(super) fn animate_results(
     }
 }
 
+pub(in crate::ui) fn is_manual_expansion_in_progress(
+    query_is_empty: bool,
+    manually_expanded: bool,
+    progress: f32,
+    target: f32,
+) -> bool {
+    query_is_empty && manually_expanded && target > progress && progress < 1.0
+}
+
+pub(in crate::ui) fn expansion_render_range(
+    start: usize,
+    total_rows: usize,
+    visible_rows: usize,
+) -> Range<usize> {
+    if total_rows == 0 {
+        return 0..0;
+    }
+
+    let start = start.min(total_rows.saturating_sub(1));
+    let render_rows = visible_rows
+        .saturating_add(EXPANSION_RENDER_BUFFER_ROWS)
+        .max(1);
+    let end = start.saturating_add(render_rows).min(total_rows);
+
+    start..end
+}
+
+pub(in crate::ui) fn spacer_height_for_rows(row_count: usize, row_step: f32) -> f32 {
+    row_count as f32 * row_step
+}
+
 pub(super) fn move_selection(selected_rank: usize, item_count: usize, offset: isize) -> usize {
     if item_count == 0 {
         return 0;
@@ -85,7 +118,8 @@ pub(super) fn scroll_start_for_selection(
 #[cfg(test)]
 mod tests {
     use super::{
-        SurfaceResize, animate_results, move_selection, results_target, scroll_start_for_selection,
+        animate_results, expansion_render_range, is_manual_expansion_in_progress, move_selection,
+        results_target, scroll_start_for_selection, spacer_height_for_rows, SurfaceResize,
     };
     use crate::ui::layout::LauncherLayout;
 
@@ -112,6 +146,27 @@ mod tests {
 
         assert_eq!(step.next_progress, 0.0);
         assert_eq!(step.surface_resize, SurfaceResize::Collapsed);
+    }
+
+    #[test]
+    fn manual_expansion_detection_is_limited_to_empty_query_expand_animation() {
+        assert!(is_manual_expansion_in_progress(true, true, 0.25, 1.0));
+        assert!(!is_manual_expansion_in_progress(false, true, 0.25, 1.0));
+        assert!(!is_manual_expansion_in_progress(true, false, 0.25, 1.0));
+        assert!(!is_manual_expansion_in_progress(true, true, 1.0, 1.0));
+    }
+
+    #[test]
+    fn expansion_render_range_limits_work_to_visible_rows_plus_buffer() {
+        assert_eq!(expansion_render_range(0, 200, 5), 0..6);
+        assert_eq!(expansion_render_range(4, 200, 5), 4..10);
+        assert_eq!(expansion_render_range(8, 10, 5), 8..10);
+    }
+
+    #[test]
+    fn spacer_height_scales_with_hidden_rows() {
+        assert_eq!(spacer_height_for_rows(0, 58.0), 0.0);
+        assert_eq!(spacer_height_for_rows(3, 58.0), 174.0);
     }
 
     #[test]

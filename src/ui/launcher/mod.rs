@@ -19,6 +19,10 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 
+pub(in crate::ui) use state::{
+    expansion_render_range, is_manual_expansion_in_progress, spacer_height_for_rows,
+};
+
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
 
