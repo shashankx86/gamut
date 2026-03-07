@@ -1,7 +1,8 @@
-use super::TrayService;
 use super::icon;
-use crate::core::ipc::{IpcCommand, send_command};
+use super::TrayService;
+use crate::core::ipc::{send_command, IpcCommand};
 use gtk::glib;
+use log::{error, info};
 use std::sync::mpsc;
 use std::thread;
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
@@ -13,6 +14,7 @@ const TRAY_ID: &str = "gamut.tray";
 const TRAY_TOOLTIP: &str = "Gamut";
 
 pub(super) fn start() -> Result<TrayService, Box<dyn std::error::Error>> {
+    info!("starting tray service");
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
 
     let thread = thread::Builder::new()
@@ -20,7 +22,10 @@ pub(super) fn start() -> Result<TrayService, Box<dyn std::error::Error>> {
         .spawn(move || run_tray_loop(ready_tx))?;
 
     match ready_rx.recv() {
-        Ok(Ok(())) => Ok(TrayService::from_thread(thread)),
+        Ok(Ok(())) => {
+            info!("tray service ready");
+            Ok(TrayService::from_thread(thread))
+        }
         Ok(Err(error)) => Err(error.into()),
         Err(error) => {
             Err(format!("tray service exited before it finished starting: {error}").into())
@@ -31,7 +36,7 @@ pub(super) fn start() -> Result<TrayService, Box<dyn std::error::Error>> {
 fn run_tray_loop(ready_tx: mpsc::SyncSender<Result<(), String>>) {
     if let Err(error) = run_tray_loop_inner(&ready_tx) {
         let _ = ready_tx.send(Err(error.to_string()));
-        eprintln!("{error}");
+        error!("{error}");
     }
 }
 
@@ -100,6 +105,6 @@ fn handle_menu_event(event: MenuEvent) {
 
 fn dispatch(command: IpcCommand) {
     if let Err(error) = send_command(command) {
-        eprintln!("Failed to dispatch tray command {:?}: {error}", command);
+        error!("failed to dispatch tray command {:?}: {error}", command);
     }
 }

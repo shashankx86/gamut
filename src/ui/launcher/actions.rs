@@ -1,7 +1,8 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::{launcher_hidden_surface_settings, launcher_visible_surface_settings};
 use super::{Launcher, Message};
-use iced::{Task, window};
+use iced::{window, Task};
+use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -14,7 +15,7 @@ impl Launcher {
         match Command::new(&app.command).args(&app.args).spawn() {
             Ok(_) => self.hide_launcher(),
             Err(error) => {
-                eprintln!("Failed to launch {}: {error}", app.name);
+                error!("failed to launch {}: {error}", app.name);
                 Task::none()
             }
         }

@@ -1,5 +1,6 @@
 use super::command::IpcCommand;
 use super::path::socket_path;
+use log::{debug, info, warn};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs::FileTypeExt;
@@ -24,6 +25,11 @@ pub fn start_listener() -> io::Result<Receiver<IpcCommand>> {
 }
 
 fn send_command_to_path(path: &Path, command: IpcCommand) -> io::Result<()> {
+    debug!(
+        "connecting to IPC socket {} for {:?}",
+        path.display(),
+        command
+    );
     let mut stream = UnixStream::connect(path)?;
     write_command_to(&mut stream, command)?;
     Ok(())
@@ -37,11 +43,15 @@ fn start_listener_at(path: &Path) -> io::Result<Receiver<IpcCommand>> {
     remove_stale_socket(path)?;
 
     let listener = UnixListener::bind(path)?;
+    info!("listening for IPC commands on {}", path.display());
     let (tx, rx) = mpsc::channel();
 
     thread::spawn(move || {
         for incoming in listener.incoming() {
             let Ok(stream) = incoming else {
+                if let Err(error) = incoming {
+                    warn!("failed to accept IPC connection: {error}");
+                }
                 continue;
             };
 
@@ -75,7 +85,10 @@ fn remove_stale_socket(path: &Path) -> io::Result<()> {
             io::ErrorKind::AddrInUse,
             "daemon already running",
         )),
-        Err(_) => fs::remove_file(path),
+        Err(_) => {
+            debug!("removing stale IPC socket at {}", path.display());
+            fs::remove_file(path)
+        }
     }
 }
 
@@ -111,7 +124,7 @@ fn read_command_from<R: BufRead>(reader: &mut R) -> Option<IpcCommand> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IpcCommand, read_command_from, start_listener_at, write_command_to};
+    use super::{read_command_from, start_listener_at, write_command_to, IpcCommand};
     use std::fs;
     use std::io::{self, BufReader, Cursor};
     use std::path::PathBuf;

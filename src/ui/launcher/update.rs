@@ -1,10 +1,11 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::{Launcher, Message};
 use crate::core::ipc::IpcCommand;
-use iced::keyboard::{self, Key, key::Named};
+use iced::keyboard::{self, key::Named, Key};
 use iced::widget;
 use iced::widget::scrollable;
-use iced::{Task, window};
+use iced::{window, Task};
+use log::{error, info};
 use std::time::{Duration, Instant};
 
 impl Launcher {
@@ -12,6 +13,7 @@ impl Launcher {
         match message {
             Message::Tick => self.on_tick(),
             Message::AppsLoaded(apps) => {
+                info!("loaded {} desktop applications", apps.len());
                 self.set_apps(apps);
                 self.request_icon_resolution_for_visible()
             }
@@ -45,7 +47,7 @@ impl Launcher {
                 Task::none()
             }
             Message::FatalError(error) => {
-                eprintln!("{error}");
+                error!("{error}");
                 iced::exit()
             }
             _ => Task::none(),
