@@ -1,6 +1,7 @@
 use super::launcher::Launcher;
 use super::layout::LauncherLayout;
 use super::theme::ResolvedAppearance;
+use iced::widget::text;
 use iced::widget::{button, container, scrollable, text_input};
 use iced::{Background, Border, Color, Shadow, Theme};
 
@@ -73,6 +74,70 @@ pub(super) fn search_input_style(
 
 pub(super) fn show_more_icon_style() -> container::Style {
     container::Style::default()
+}
+
+pub(super) fn preferences_root_style(appearance: &ResolvedAppearance) -> container::Style {
+    container::Style {
+        text_color: Some(appearance.primary_text),
+        background: Some(Background::Color(appearance.panel_background)),
+        ..container::Style::default()
+    }
+}
+
+pub(super) fn preferences_card_style(appearance: &ResolvedAppearance) -> container::Style {
+    container::Style {
+        text_color: Some(appearance.primary_text),
+        background: Some(Background::Color(Color {
+            a: 0.55,
+            ..appearance.selection
+        })),
+        border: Border {
+            color: appearance.panel_border,
+            width: 1.0,
+            radius: 18.0.into(),
+        },
+        ..container::Style::default()
+    }
+}
+
+pub(super) fn button_surface_style(
+    appearance: &ResolvedAppearance,
+    status: button::Status,
+) -> button::Style {
+    let background = match status {
+        button::Status::Hovered => appearance.first_row_hover,
+        button::Status::Pressed => appearance.first_row_pressed,
+        _ => appearance.first_row_active,
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: appearance.primary_text,
+        border: Border {
+            color: appearance.panel_border,
+            width: 1.0,
+            radius: 12.0.into(),
+        },
+        ..button::Style::default()
+    }
+}
+
+pub(super) fn preferences_section_title_style(appearance: &ResolvedAppearance) -> text::Style {
+    text::Style {
+        color: Some(appearance.primary_text),
+    }
+}
+
+pub(super) fn helper_text_style(appearance: &ResolvedAppearance) -> text::Style {
+    text::Style {
+        color: Some(appearance.secondary_text),
+    }
+}
+
+pub(super) fn error_text_style(appearance: &ResolvedAppearance) -> text::Style {
+    text::Style {
+        color: Some(appearance.scrollbar_scroller_dragged_border),
+    }
 }
 
 pub(super) fn result_button_style(

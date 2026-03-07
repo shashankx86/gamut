@@ -1,4 +1,5 @@
 mod actions;
+mod preferences;
 mod state;
 mod subscription;
 mod update;
@@ -7,26 +8,57 @@ use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
 use super::surface::launcher_hidden_surface_settings;
 use super::theme::{ResolvedAppearance, resolve_appearance, resolve_theme};
-use crate::core::preferences::{AppPreferences, load_preferences};
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
 };
 use crate::core::ipc::{IpcCommand, start_listener};
+use crate::core::preferences::{
+    AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
+    load_preferences,
+};
 use iced::Size;
-use iced::widget;
+use iced::keyboard::Modifiers;
+use iced::widget::{self, Id};
 use iced::{Task, window};
+use iced_layershell::actions::IcedXdgWindowSettings;
 use iced_layershell::to_layer_message;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 
+pub(in crate::ui) use preferences::{PreferencesEditor, ShortcutAction, ThemeColorField};
 pub(in crate::ui) use state::{
     expansion_render_range, is_manual_expansion_in_progress, spacer_height_for_rows,
 };
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
+const PREFERENCES_WINDOW_SIZE: (u32, u32) = (760, 880);
+
+pub(in crate::ui) const THEME_OPTIONS: [ThemePreference; 4] = [
+    ThemePreference::Dark,
+    ThemePreference::Light,
+    ThemePreference::System,
+    ThemePreference::Custom,
+];
+pub(in crate::ui) const RADIUS_OPTIONS: [RadiusPreference; 4] = [
+    RadiusPreference::Small,
+    RadiusPreference::Medium,
+    RadiusPreference::Large,
+    RadiusPreference::Custom,
+];
+pub(in crate::ui) const SIZE_OPTIONS: [LauncherSize; 4] = [
+    LauncherSize::Small,
+    LauncherSize::Medium,
+    LauncherSize::Large,
+    LauncherSize::ExtraLarge,
+];
+pub(in crate::ui) const PLACEMENT_OPTIONS: [LauncherPlacement; 3] = [
+    LauncherPlacement::RaisedCenter,
+    LauncherPlacement::Center,
+    LauncherPlacement::Custom,
+];
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -56,7 +88,8 @@ pub(super) struct Launcher {
     pub(super) normalized_query: String,
     pub(super) input_id: widget::Id,
     pub(super) results_scroll_id: widget::Id,
-    pub(super) window_id: Option<window::Id>,
+    pub(super) launcher_window_id: Option<window::Id>,
+    pub(super) preferences_window_id: Option<window::Id>,
     pub(super) monitor_size: Option<Size>,
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
@@ -70,6 +103,16 @@ pub(super) struct Launcher {
     pub(super) manually_expanded: bool,
     layout_preferences: LauncherPreferences,
     pub(super) app_preferences: AppPreferences,
+    pub(super) preferences_editor: PreferencesEditor,
+    pub(super) preferences_scroll_id: Id,
+    pub(super) custom_background_input_id: Id,
+    pub(super) custom_text_input_id: Id,
+    pub(super) custom_accent_input_id: Id,
+    pub(super) shortcut_launch_input_id: Id,
+    pub(super) shortcut_down_input_id: Id,
+    pub(super) shortcut_up_input_id: Id,
+    pub(super) shortcut_close_input_id: Id,
+    modifiers: Modifiers,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
 }
@@ -88,6 +131,16 @@ pub(super) enum Message {
     WindowEvent(window::Id, window::Event),
     WindowOpened(window::Id),
     WindowClosed(window::Id),
+    PreferencesThemeSelected(ThemePreference),
+    PreferencesRadiusSelected(RadiusPreference),
+    PreferencesSizeSelected(LauncherSize),
+    PreferencesPlacementSelected(LauncherPlacement),
+    PreferencesCustomRadiusChanged(f32),
+    PreferencesCustomTopMarginChanged(f32),
+    PreferencesThemeColorChanged(ThemeColorField, String),
+    PreferencesShortcutChanged(ShortcutAction, String),
+    PreferencesCaptureShortcut(ShortcutAction),
+    PreferencesCloseRequested,
     FatalError(String),
     MonitorSizeLoaded(Option<Size>),
     SyncHighlightedRank { revision: u64, rank: usize },
@@ -98,6 +151,7 @@ impl Launcher {
         let layout_preferences = LauncherPreferences::load_from_env();
         let app_preferences = load_preferences();
         let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
+        let preferences_editor = PreferencesEditor::from_preferences(&app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
         let hidden_window_id = window::Id::unique();
@@ -132,7 +186,8 @@ impl Launcher {
                 normalized_query: String::new(),
                 input_id,
                 results_scroll_id,
-                window_id: Some(hidden_window_id),
+                launcher_window_id: Some(hidden_window_id),
+                preferences_window_id: None,
                 monitor_size: None,
                 is_visible: false,
                 ignore_unfocus_until: None,
@@ -146,6 +201,16 @@ impl Launcher {
                 manually_expanded: false,
                 layout_preferences,
                 app_preferences,
+                preferences_editor,
+                preferences_scroll_id: Id::unique(),
+                custom_background_input_id: Id::unique(),
+                custom_text_input_id: Id::unique(),
+                custom_accent_input_id: Id::unique(),
+                shortcut_launch_input_id: Id::unique(),
+                shortcut_down_input_id: Id::unique(),
+                shortcut_up_input_id: Id::unique(),
+                shortcut_close_input_id: Id::unique(),
+                modifiers: Modifiers::default(),
                 icon_resolve_in_flight: false,
                 ipc_handle,
             },
@@ -233,7 +298,7 @@ impl Launcher {
         let step = state::animate_results(self.results_progress, self.results_target, &self.layout);
         self.results_progress = step.next_progress;
 
-        let Some(id) = self.window_id else {
+        let Some(id) = self.launcher_window_id else {
             return Task::none();
         };
 
@@ -355,7 +420,7 @@ impl Launcher {
             return self.recreate_launcher_surface();
         }
 
-        let Some(id) = self.window_id else {
+        let Some(id) = self.launcher_window_id else {
             return Task::none();
         };
 
@@ -392,6 +457,8 @@ impl Launcher {
 
     pub(super) fn reload_preferences_from_disk(&mut self) -> Task<Message> {
         self.app_preferences = load_preferences();
+        self.preferences_editor
+            .sync_from_preferences(&self.app_preferences);
         self.update_layout(self.monitor_size)
     }
 
@@ -403,7 +470,30 @@ impl Launcher {
         resolve_theme(&self.app_preferences.appearance)
     }
 
-    pub(super) fn window_title(&self, _id: window::Id) -> Option<String> {
-        Some("Gamut".to_string())
+    pub(super) fn window_theme_for(&self, id: window::Id) -> iced::Theme {
+        let _ = id;
+        self.window_theme()
+    }
+
+    pub(super) fn window_title(&self, id: window::Id) -> Option<String> {
+        if self.preferences_window_id == Some(id) {
+            Some("Gamut Preferences".to_string())
+        } else {
+            Some("Gamut".to_string())
+        }
+    }
+
+    pub(super) fn is_launcher_window(&self, id: window::Id) -> bool {
+        self.launcher_window_id == Some(id)
+    }
+
+    pub(super) fn is_preferences_window(&self, id: window::Id) -> bool {
+        self.preferences_window_id == Some(id)
+    }
+
+    pub(super) fn preferences_window_settings(&self) -> IcedXdgWindowSettings {
+        IcedXdgWindowSettings {
+            size: Some(PREFERENCES_WINDOW_SIZE),
+        }
     }
 }

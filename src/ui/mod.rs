@@ -36,7 +36,7 @@ pub fn run_daemon() -> Result<(), DynError> {
 }
 
 fn launcher_theme(_state: &Launcher, _id: window::Id) -> Theme {
-    _state.window_theme()
+    _state.window_theme_for(_id)
 }
 
 fn launcher_title(state: &Launcher, id: window::Id) -> Option<String> {

@@ -1,6 +1,6 @@
-use super::icon;
 use super::TrayService;
-use crate::core::ipc::{send_command, IpcCommand};
+use super::icon;
+use crate::core::ipc::{IpcCommand, send_command};
 use gtk::glib;
 use log::{error, info};
 use std::sync::mpsc;
@@ -9,6 +9,7 @@ use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 const OPEN_LAUNCHER_ID: &str = "tray.open-launcher";
+const OPEN_PREFERENCES_ID: &str = "tray.open-preferences";
 const QUIT_ID: &str = "tray.quit";
 const TRAY_ID: &str = "gamut.tray";
 const TRAY_TOOLTIP: &str = "Gamut";
@@ -71,10 +72,12 @@ fn build_tray_menu() -> Result<Menu, Box<dyn std::error::Error>> {
     let menu = Menu::new();
     let open_launcher =
         MenuItem::with_id(MenuId::new(OPEN_LAUNCHER_ID), "Open Launcher", true, None);
+    let open_preferences =
+        MenuItem::with_id(MenuId::new(OPEN_PREFERENCES_ID), "Preferences", true, None);
     let separator = PredefinedMenuItem::separator();
     let quit = MenuItem::with_id(MenuId::new(QUIT_ID), "Quit", true, None);
 
-    menu.append_items(&[&open_launcher, &separator, &quit])?;
+    menu.append_items(&[&open_launcher, &open_preferences, &separator, &quit])?;
 
     Ok(menu)
 }
@@ -98,6 +101,7 @@ fn handle_tray_event(event: TrayIconEvent) {
 fn handle_menu_event(event: MenuEvent) {
     match event.id().as_ref() {
         OPEN_LAUNCHER_ID => dispatch(IpcCommand::Show),
+        OPEN_PREFERENCES_ID => dispatch(IpcCommand::OpenPreferences),
         QUIT_ID => dispatch(IpcCommand::Quit),
         _ => {}
     }

@@ -3,6 +3,6 @@ mod store;
 
 pub(crate) use model::{
     AppPreferences, AppearancePreferences, CustomThemeColors, LauncherPlacement, LauncherSize,
-    RadiusPreference, ThemePreference,
+    RadiusPreference, ShortcutBinding, ShortcutPreferences, ThemePreference,
 };
-pub(crate) use store::load_preferences;
+pub(crate) use store::{load_preferences, save_preferences};

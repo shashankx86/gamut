@@ -1,19 +1,33 @@
-use super::launcher::{Launcher, Message};
-use super::styles::{
-    backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
-    results_scroll_style, search_input_style, show_more_icon_style,
+use super::launcher::{
+    Launcher, Message, PLACEMENT_OPTIONS, RADIUS_OPTIONS, SIZE_OPTIONS, ShortcutAction,
+    THEME_OPTIONS, ThemeColorField,
 };
-use crate::core::desktop::{trim_label, DesktopApp};
+use super::styles::{
+    backdrop_style, bottom_strip_style, button_surface_style, divider_style, error_text_style,
+    helper_text_style, panel_style, preferences_card_style, preferences_root_style,
+    preferences_section_title_style, result_button_style, results_scroll_style, search_input_style,
+    show_more_icon_style,
+};
+use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::preferences::{
+    LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
+};
 use iced::widget::svg::Handle as SvgHandle;
-use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{window, Color, ContentFit, Element, Length};
+use iced::widget::{
+    Id, button, column, container, image, radio, row, scrollable, slider, svg, text, text_input,
+};
+use iced::{Color, ContentFit, Element, Length, window};
 
 const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const ENTER_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M14 8V11.5C14 12.0523 13.5523 12.5 13 12.5H8" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 10L8 12.5L10.5 15" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 
 impl Launcher {
-    pub(super) fn view(&self, _window: window::Id) -> Element<'_, Message> {
+    pub(super) fn view(&self, window: window::Id) -> Element<'_, Message> {
+        if self.is_preferences_window(window) {
+            return self.view_preferences_window();
+        }
+
         let appearance = self.resolved_appearance();
 
         if !self.is_visible {
@@ -312,5 +326,373 @@ impl Launcher {
             self.result_render_range().start,
             self.layout.result_row_scroll_step(),
         )
+    }
+
+    fn view_preferences_window(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+
+        let content = column![
+            self.preferences_header(),
+            self.preferences_appearance_section(),
+            self.preferences_layout_section(),
+            self.preferences_shortcuts_section(),
+            self.preferences_feedback_section(),
+        ]
+        .spacing(18)
+        .padding(24)
+        .width(Length::Fill);
+
+        container(
+            scrollable(content)
+                .id(self.preferences_scroll_id.clone())
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |theme, status| results_scroll_style(theme, &appearance, status)),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |_| preferences_root_style(&appearance))
+        .into()
+    }
+
+    fn preferences_header(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let close = button(text("Close").size(14))
+            .on_press(Message::PreferencesCloseRequested)
+            .style(move |_theme, status| button_surface_style(&appearance, status));
+
+        container(
+            row![
+                column![
+                    text("Preferences").size(26).color(appearance.primary_text),
+                    text("Adjust appearance, layout, and shortcuts. Changes apply immediately.")
+                        .size(14)
+                        .color(appearance.secondary_text),
+                ]
+                .spacing(6)
+                .width(Length::Fill),
+                close,
+            ]
+            .align_y(iced::alignment::Vertical::Center)
+            .spacing(12),
+        )
+        .style(move |_| preferences_card_style(&appearance))
+        .padding(20)
+        .into()
+    }
+
+    fn preferences_appearance_section(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let prefs = &self.app_preferences.appearance;
+
+        let theme_radios = THEME_OPTIONS.iter().copied().fold(
+            column![].spacing(10),
+            |column: iced::widget::Column<'_, Message>, option| {
+                column.push(radio(
+                    theme_label(option),
+                    option,
+                    Some(prefs.theme),
+                    Message::PreferencesThemeSelected,
+                ))
+            },
+        );
+
+        let radius_radios = RADIUS_OPTIONS.iter().copied().fold(
+            column![].spacing(10),
+            |column: iced::widget::Column<'_, Message>, option| {
+                column.push(radio(
+                    radius_label(option),
+                    option,
+                    Some(prefs.radius),
+                    Message::PreferencesRadiusSelected,
+                ))
+            },
+        );
+
+        let custom_colors = column![
+            self.preferences_text_field(
+                "Background color",
+                "#151516",
+                self.preferences_editor
+                    .theme_value(ThemeColorField::Background),
+                self.custom_background_input_id.clone(),
+                move |value| Message::PreferencesThemeColorChanged(
+                    ThemeColorField::Background,
+                    value
+                ),
+            ),
+            self.preferences_text_field(
+                "Text color",
+                "#EBEDF2",
+                self.preferences_editor.theme_value(ThemeColorField::Text),
+                self.custom_text_input_id.clone(),
+                move |value| Message::PreferencesThemeColorChanged(ThemeColorField::Text, value),
+            ),
+            self.preferences_text_field(
+                "Accent color",
+                "#5E8BFF",
+                self.preferences_editor.theme_value(ThemeColorField::Accent),
+                self.custom_accent_input_id.clone(),
+                move |value| Message::PreferencesThemeColorChanged(ThemeColorField::Accent, value),
+            ),
+        ]
+        .spacing(12);
+
+        let radius_slider = column![
+            text(format!("Custom radius: {:.0}px", prefs.custom_radius))
+                .size(14)
+                .color(appearance.primary_text),
+            slider(
+                0.0..=36.0,
+                prefs.custom_radius,
+                Message::PreferencesCustomRadiusChanged
+            ),
+        ]
+        .spacing(8);
+
+        self.preferences_card(
+            "Appearance",
+            "Theme, custom colors, and surface rounding.",
+            column![theme_radios, custom_colors, radius_radios, radius_slider].spacing(16),
+        )
+    }
+
+    fn preferences_layout_section(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let prefs = &self.app_preferences.layout;
+
+        let size_radios = SIZE_OPTIONS.iter().copied().fold(
+            column![].spacing(10),
+            |column: iced::widget::Column<'_, Message>, option| {
+                column.push(radio(
+                    size_label(option),
+                    option,
+                    Some(prefs.size),
+                    Message::PreferencesSizeSelected,
+                ))
+            },
+        );
+
+        let placement_radios = PLACEMENT_OPTIONS.iter().copied().fold(
+            column![].spacing(10),
+            |column: iced::widget::Column<'_, Message>, option| {
+                column.push(radio(
+                    placement_label(option),
+                    option,
+                    Some(prefs.placement),
+                    Message::PreferencesPlacementSelected,
+                ))
+            },
+        );
+
+        let top_margin_slider = column![
+            text(format!(
+                "Custom top offset: {:.0}px",
+                prefs.custom_top_margin
+            ))
+            .size(14)
+            .color(appearance.primary_text),
+            slider(
+                0.0..=320.0,
+                prefs.custom_top_margin,
+                Message::PreferencesCustomTopMarginChanged
+            ),
+        ]
+        .spacing(8);
+
+        self.preferences_card(
+            "Layout",
+            "Control launcher scale and on-screen position.",
+            column![size_radios, placement_radios, top_margin_slider].spacing(16),
+        )
+    }
+
+    fn preferences_shortcuts_section(&self) -> Element<'_, Message> {
+        let rows = ShortcutAction::ALL.iter().copied().fold(
+            column![].spacing(14),
+            |column: iced::widget::Column<'_, Message>, action| {
+                column.push(self.shortcut_row(action))
+            },
+        );
+
+        self.preferences_card(
+            "Shortcuts",
+            "These are the launcher shortcuts currently handled inside the app.",
+            rows,
+        )
+    }
+
+    fn preferences_feedback_section(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let mut content = column![].spacing(8);
+        let mut has_feedback = false;
+
+        if let Some(message) = self.preferences_editor.theme_error() {
+            has_feedback = true;
+            content = content.push(
+                text(message)
+                    .size(13)
+                    .style(move |_theme| error_text_style(&appearance)),
+            );
+        }
+
+        if let Some(message) = self.preferences_editor.shortcut_error() {
+            has_feedback = true;
+            content = content.push(
+                text(message)
+                    .size(13)
+                    .style(move |_theme| error_text_style(&appearance)),
+            );
+        }
+
+        if let Some(message) = self.preferences_editor.save_error() {
+            has_feedback = true;
+            content = content.push(
+                text(message)
+                    .size(13)
+                    .style(move |_theme| error_text_style(&appearance)),
+            );
+        }
+
+        if !has_feedback {
+            content = content.push(
+                text("Preferences are saved to disk as soon as you change them.")
+                    .size(13)
+                    .style(move |_theme| helper_text_style(&appearance)),
+            );
+        }
+
+        container(content).into()
+    }
+
+    fn preferences_card<'a>(
+        &self,
+        title: &'a str,
+        subtitle: &'a str,
+        body: iced::widget::Column<'a, Message>,
+    ) -> Element<'a, Message> {
+        let appearance = self.resolved_appearance();
+
+        container(
+            column![
+                text(title)
+                    .size(18)
+                    .style(move |_theme| preferences_section_title_style(&appearance)),
+                text(subtitle)
+                    .size(13)
+                    .style(move |_theme| helper_text_style(&appearance)),
+                body,
+            ]
+            .spacing(12),
+        )
+        .padding(20)
+        .style(move |_| preferences_card_style(&appearance))
+        .into()
+    }
+
+    fn preferences_text_field<'a, F>(
+        &self,
+        label: &'a str,
+        placeholder: &'a str,
+        value: &'a str,
+        id: Id,
+        on_input: F,
+    ) -> Element<'a, Message>
+    where
+        F: 'static + Fn(String) -> Message + Clone,
+    {
+        let appearance = self.resolved_appearance();
+        container(
+            column![
+                text(label)
+                    .size(14)
+                    .style(move |_theme| preferences_section_title_style(&appearance)),
+                text_input(placeholder, value)
+                    .id(id)
+                    .on_input(on_input)
+                    .padding([10, 12])
+                    .size(14)
+                    .style(move |_theme, status| search_input_style(&appearance, status)),
+            ]
+            .spacing(6),
+        )
+        .into()
+    }
+
+    fn shortcut_row(&self, action: ShortcutAction) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let input_id = match action {
+            ShortcutAction::LaunchSelected => self.shortcut_launch_input_id.clone(),
+            ShortcutAction::ExpandOrMoveDown => self.shortcut_down_input_id.clone(),
+            ShortcutAction::MoveUp => self.shortcut_up_input_id.clone(),
+            ShortcutAction::CloseLauncher => self.shortcut_close_input_id.clone(),
+        };
+
+        let capture = button(text("Capture modifiers + Enter").size(12))
+            .on_press(Message::PreferencesCaptureShortcut(action))
+            .style(move |_theme, status| button_surface_style(&appearance, status));
+
+        container(
+            column![
+                text(action.label())
+                    .size(14)
+                    .style(move |_theme| preferences_section_title_style(&appearance)),
+                text(action.helper_text())
+                    .size(12)
+                    .style(move |_theme| helper_text_style(&appearance)),
+                row![
+                    text_input(
+                        "Ctrl+Shift+K",
+                        self.preferences_editor.shortcut_value(action)
+                    )
+                    .id(input_id)
+                    .on_input(move |value| Message::PreferencesShortcutChanged(action, value))
+                    .padding([10, 12])
+                    .size(14)
+                    .style(move |_theme, status| search_input_style(&appearance, status))
+                    .width(Length::Fill),
+                    capture,
+                ]
+                .spacing(10)
+                .align_y(iced::alignment::Vertical::Center),
+            ]
+            .spacing(6),
+        )
+        .into()
+    }
+}
+
+fn theme_label(value: ThemePreference) -> &'static str {
+    match value {
+        ThemePreference::Dark => "Dark",
+        ThemePreference::Light => "Light",
+        ThemePreference::System => "System",
+        ThemePreference::Custom => "Custom",
+    }
+}
+
+fn radius_label(value: RadiusPreference) -> &'static str {
+    match value {
+        RadiusPreference::Small => "Small",
+        RadiusPreference::Medium => "Medium",
+        RadiusPreference::Large => "Large",
+        RadiusPreference::Custom => "Custom",
+    }
+}
+
+fn size_label(value: LauncherSize) -> &'static str {
+    match value {
+        LauncherSize::Small => "Small",
+        LauncherSize::Medium => "Medium",
+        LauncherSize::Large => "Large",
+        LauncherSize::ExtraLarge => "Extra large",
+    }
+}
+
+fn placement_label(value: LauncherPlacement) -> &'static str {
+    match value {
+        LauncherPlacement::RaisedCenter => "Raised center",
+        LauncherPlacement::Center => "Center",
+        LauncherPlacement::Custom => "Custom",
     }
 }
