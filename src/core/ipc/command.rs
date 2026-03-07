@@ -2,6 +2,7 @@
 pub enum IpcCommand {
     Show,
     Toggle,
+    ReloadPreferences,
     Quit,
     Ping,
 }
@@ -11,6 +12,7 @@ impl IpcCommand {
         match self {
             Self::Show => "show\n",
             Self::Toggle => "toggle\n",
+            Self::ReloadPreferences => "reload-preferences\n",
             Self::Quit => "quit\n",
             Self::Ping => "ping\n",
         }
@@ -20,6 +22,7 @@ impl IpcCommand {
         match line.trim() {
             "show" => Some(Self::Show),
             "toggle" => Some(Self::Toggle),
+            "reload-preferences" => Some(Self::ReloadPreferences),
             "quit" => Some(Self::Quit),
             "ping" => Some(Self::Ping),
             _ => None,
@@ -35,6 +38,10 @@ mod tests {
     fn parses_wire_commands() {
         assert_eq!(IpcCommand::from_wire("show"), Some(IpcCommand::Show));
         assert_eq!(IpcCommand::from_wire("toggle"), Some(IpcCommand::Toggle));
+        assert_eq!(
+            IpcCommand::from_wire("reload-preferences"),
+            Some(IpcCommand::ReloadPreferences),
+        );
         assert_eq!(IpcCommand::from_wire("quit"), Some(IpcCommand::Quit));
         assert_eq!(IpcCommand::from_wire("ping"), Some(IpcCommand::Ping));
         assert_eq!(IpcCommand::from_wire("noop"), None);
@@ -44,6 +51,10 @@ mod tests {
     fn writes_wire_commands() {
         assert_eq!(IpcCommand::Show.as_wire(), "show\n");
         assert_eq!(IpcCommand::Toggle.as_wire(), "toggle\n");
+        assert_eq!(
+            IpcCommand::ReloadPreferences.as_wire(),
+            "reload-preferences\n",
+        );
         assert_eq!(IpcCommand::Quit.as_wire(), "quit\n");
         assert_eq!(IpcCommand::Ping.as_wire(), "ping\n");
     }

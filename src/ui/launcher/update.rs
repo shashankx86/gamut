@@ -68,6 +68,7 @@ impl Launcher {
                     self.show_launcher()
                 }
             }
+            IpcCommand::ReloadPreferences => Task::none(),
             IpcCommand::Quit => iced::exit(),
             IpcCommand::Ping => Task::none(),
         }
