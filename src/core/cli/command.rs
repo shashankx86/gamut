@@ -4,6 +4,7 @@ use std::ffi::OsString;
 pub enum CliMode {
     Toggle,
     Daemon,
+    Preferences,
     Quit,
 }
 
@@ -12,6 +13,7 @@ impl CliMode {
         match self {
             Self::Toggle => "toggle",
             Self::Daemon => "daemon",
+            Self::Preferences => "preferences",
             Self::Quit => "quit",
         }
     }
@@ -51,6 +53,7 @@ where
         .into_iter()
         .fold(CliMode::Toggle, |mode, flag| match flag.as_str() {
             "--daemon" => CliMode::Daemon,
+            "--preferences" => CliMode::Preferences,
             "--quit" => CliMode::Quit,
             "--toggle" => CliMode::Toggle,
             _ => mode,

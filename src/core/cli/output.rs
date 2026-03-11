@@ -13,7 +13,7 @@ const ASCII_ART: &str = r"
 
 pub fn help_text() -> String {
     format!(
-        "{ASCII_ART}\n\nUsage:\n  {} [OPTIONS]\n\nOptions:\n  -h, --help       Show this help message\n  -v, --version    Show version\n      --toggle     Toggle the launcher (default)\n      --daemon     Run the daemon process\n      --quit       Ask the running daemon to quit\n",
+        "{ASCII_ART}\n\nUsage:\n  {} [OPTIONS]\n\nOptions:\n  -h, --help          Show this help message\n  -v, --version       Show version\n      --toggle        Toggle the launcher (default)\n      --daemon        Run the daemon process\n      --preferences   Open the preferences window\n      --quit          Ask the running daemon to quit\n",
         env!("CARGO_PKG_NAME"),
     )
 }

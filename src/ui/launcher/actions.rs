@@ -3,6 +3,7 @@ use super::super::surface::{launcher_hidden_surface_settings, launcher_visible_s
 use super::{Launcher, Message};
 use iced::{Task, window};
 use log::error;
+use std::env;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -73,19 +74,25 @@ impl Launcher {
     }
 
     pub(super) fn open_preferences_window(&mut self) -> Task<Message> {
-        if self.preferences_window_id.is_some() {
-            return Task::none();
+        let current_exe = match env::current_exe() {
+            Ok(path) => path,
+            Err(error) => {
+                error!("failed to locate current executable for preferences window: {error}");
+                return Task::none();
+            }
+        };
+
+        if let Err(error) = Command::new(current_exe)
+            .arg("--preferences")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::inherit())
+            .spawn()
+        {
+            error!("failed to open preferences window: {error}");
         }
 
-        let id = window::Id::unique();
-        self.preferences_window_id = Some(id);
-        self.preferences_editor
-            .sync_from_preferences(&self.app_preferences);
-
-        Task::done(Message::NewBaseWindow {
-            settings: self.preferences_window_settings(),
-            id,
-        })
+        Task::none()
     }
 
     pub(super) fn close_preferences_window(&mut self) -> Task<Message> {

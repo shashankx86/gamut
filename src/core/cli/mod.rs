@@ -29,6 +29,10 @@ mod tests {
             CliCommand::Run(CliMode::Quit),
         );
         assert_eq!(
+            parse_command([OsString::from("value"), OsString::from("--preferences")]),
+            CliCommand::Run(CliMode::Preferences),
+        );
+        assert_eq!(
             parse_command([OsString::from("value"), OsString::from("--toggle")]),
             CliCommand::Run(CliMode::Toggle),
         );
@@ -55,6 +59,7 @@ mod tests {
         assert_eq!(
             parse_command([
                 OsString::from("--daemon"),
+                OsString::from("--preferences"),
                 OsString::from("--quit"),
                 OsString::from("--toggle"),
             ]),

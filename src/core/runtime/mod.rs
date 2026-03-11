@@ -45,6 +45,7 @@ fn run_mode(mode: CliMode) -> Result<(), DynError> {
     match mode {
         CliMode::Daemon => run_daemon(),
         CliMode::Toggle => ensure_daemon_and_send(IpcCommand::Toggle),
+        CliMode::Preferences => ui::run_preferences(),
         CliMode::Quit => send_quit(),
     }
 }

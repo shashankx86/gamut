@@ -3,10 +3,12 @@ use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AppPreferences {
     pub appearance: AppearancePreferences,
     pub layout: LayoutPreferences,
     pub shortcuts: ShortcutPreferences,
+    pub system: SystemPreferences,
 }
 
 impl Default for AppPreferences {
@@ -15,6 +17,7 @@ impl Default for AppPreferences {
             appearance: AppearancePreferences::default(),
             layout: LayoutPreferences::default(),
             shortcuts: ShortcutPreferences::default(),
+            system: SystemPreferences::default(),
         }
     }
 }
@@ -30,9 +33,9 @@ pub struct AppearancePreferences {
 impl Default for AppearancePreferences {
     fn default() -> Self {
         Self {
-            theme: ThemePreference::Dark,
+            theme: ThemePreference::System,
             custom_theme: CustomThemeColors::default(),
-            radius: RadiusPreference::Small,
+            radius: RadiusPreference::Medium,
             custom_radius: 10.0,
         }
     }
@@ -45,6 +48,12 @@ pub enum ThemePreference {
     Dark,
     System,
     Custom,
+}
+
+impl Default for ThemePreference {
+    fn default() -> Self {
+        Self::System
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +82,12 @@ pub enum RadiusPreference {
     Custom,
 }
 
+impl Default for RadiusPreference {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutPreferences {
     pub size: LauncherSize,
@@ -99,12 +114,37 @@ pub enum LauncherSize {
     ExtraLarge,
 }
 
+impl Default for LauncherSize {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LauncherPlacement {
     Center,
     RaisedCenter,
     Custom,
+}
+
+impl Default for LauncherPlacement {
+    fn default() -> Self {
+        Self::RaisedCenter
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SystemPreferences {
+    pub start_at_login: bool,
+}
+
+impl Default for SystemPreferences {
+    fn default() -> Self {
+        Self {
+            start_at_login: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -245,17 +285,18 @@ mod tests {
 
         assert_eq!(
             preferences.appearance.theme as u8,
-            super::ThemePreference::Dark as u8
+            super::ThemePreference::System as u8
         );
         assert_eq!(
             preferences.appearance.radius as u8,
-            super::RadiusPreference::Small as u8
+            super::RadiusPreference::Medium as u8
         );
         assert_eq!(
             preferences.layout.placement as u8,
             super::LauncherPlacement::RaisedCenter as u8,
         );
         assert_eq!(preferences.shortcuts, ShortcutPreferences::default());
+        assert!(!preferences.system.start_at_login);
     }
 
     #[test]

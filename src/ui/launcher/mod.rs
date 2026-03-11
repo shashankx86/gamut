@@ -20,7 +20,6 @@ use iced::Size;
 use iced::keyboard::Modifiers;
 use iced::widget::{self, Id};
 use iced::{Task, window};
-use iced_layershell::actions::IcedXdgWindowSettings;
 use iced_layershell::to_layer_message;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -34,8 +33,6 @@ pub(in crate::ui) use state::{
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
-const PREFERENCES_WINDOW_SIZE: (u32, u32) = (760, 880);
-
 pub(in crate::ui) const THEME_OPTIONS: [ThemePreference; 4] = [
     ThemePreference::Dark,
     ThemePreference::Light,
@@ -489,11 +486,5 @@ impl Launcher {
 
     pub(super) fn is_preferences_window(&self, id: window::Id) -> bool {
         self.preferences_window_id == Some(id)
-    }
-
-    pub(super) fn preferences_window_settings(&self) -> IcedXdgWindowSettings {
-        IcedXdgWindowSettings {
-            size: Some(PREFERENCES_WINDOW_SIZE),
-        }
     }
 }
