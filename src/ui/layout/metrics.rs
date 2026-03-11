@@ -154,10 +154,6 @@ impl LauncherLayout {
         layout
     }
 
-    pub(in crate::ui) fn hidden_surface_size(&self) -> (u32, u32) {
-        (round_to_u32(self.panel_width), self.hidden_surface_height)
-    }
-
     pub(in crate::ui) fn collapsed_surface_size(&self) -> (u32, u32) {
         (
             round_to_u32(self.panel_width),

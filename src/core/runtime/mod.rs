@@ -1,4 +1,5 @@
-use crate::core::cli::{CliCommand, CliMode, parse_command, print_help, print_version};
+use crate::core::cli::{parse_command, print_help, print_version, CliCommand, CliMode};
+use crate::core::display_target::active_output_name;
 use crate::core::ipc::{self, IpcCommand};
 use crate::core::logging;
 use crate::core::tray;
@@ -44,7 +45,9 @@ where
 fn run_mode(mode: CliMode) -> Result<(), DynError> {
     match mode {
         CliMode::Daemon => run_daemon(),
-        CliMode::Toggle => ensure_daemon_and_send(IpcCommand::Toggle),
+        CliMode::Toggle => ensure_daemon_and_send(IpcCommand::Toggle {
+            target_output: active_output_name(),
+        }),
         CliMode::Preferences => ui::run_preferences(),
         CliMode::Quit => send_quit(),
     }
@@ -58,9 +61,10 @@ fn run_daemon() -> Result<(), DynError> {
         return Err("gamut daemon is already running".into());
     }
 
-    let _tray_service = tray::start()?;
+    let (command_tx, command_rx) = std::sync::mpsc::channel();
+    let _tray_service = tray::start(command_tx)?;
     info!("tray service started");
-    ui::run_daemon()
+    ui::run_daemon(command_rx)
 }
 
 fn send_quit() -> Result<(), DynError> {
@@ -72,7 +76,7 @@ fn send_quit() -> Result<(), DynError> {
 fn ensure_daemon_and_send(command: IpcCommand) -> Result<(), DynError> {
     debug!("sending IPC command: {:?}", command);
 
-    if ipc::send_command(command).is_ok() {
+    if ipc::send_command(command.clone()).is_ok() {
         return Ok(());
     }
 
@@ -101,7 +105,7 @@ fn wait_for_daemon(command: IpcCommand, daemon_child: &mut Child) -> Result<(), 
     for attempt in 1..=DAEMON_START_RETRIES {
         thread::sleep(DAEMON_START_DELAY);
 
-        match ipc::send_command(command) {
+        match ipc::send_command(command.clone()) {
             Ok(()) => return Ok(()),
             Err(error) => {
                 debug!("daemon not ready after attempt {attempt}/{DAEMON_START_RETRIES}: {error}");

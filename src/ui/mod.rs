@@ -13,13 +13,29 @@ use iced_layershell::daemon;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 use launcher::Launcher;
 use std::error::Error;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Receiver;
+
+use crate::core::app_command::AppCommand;
 use styles::launcher_base_style;
 
 type DynError = Box<dyn Error>;
 
-pub fn run_daemon() -> Result<(), DynError> {
+pub fn run_daemon(command_rx: Receiver<AppCommand>) -> Result<(), DynError> {
+    let command_rx = Arc::new(Mutex::new(Some(command_rx)));
+
     daemon(
-        Launcher::new,
+        {
+            let command_rx = Arc::clone(&command_rx);
+            move || {
+                let receiver = command_rx
+                    .lock()
+                    .expect("app command receiver poisoned")
+                    .take()
+                    .expect("launcher boot called more than once");
+                Launcher::new(receiver)
+            }
+        },
         surface::namespace,
         Launcher::update,
         Launcher::view,

@@ -6,8 +6,8 @@ mod update;
 
 use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
-use super::surface::launcher_hidden_surface_settings;
 use super::theme::{ResolvedAppearance, resolve_appearance, resolve_theme};
+use crate::core::app_command::AppCommand;
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
 };
@@ -63,6 +63,27 @@ pub(super) struct IpcReceiverHandle {
     receiver: Arc<Mutex<Receiver<IpcCommand>>>,
 }
 
+#[derive(Clone)]
+pub(super) struct AppCommandReceiverHandle {
+    id: u64,
+    receiver: Arc<Mutex<Receiver<AppCommand>>>,
+}
+
+impl AppCommandReceiverHandle {
+    fn new(receiver: Receiver<AppCommand>) -> Self {
+        Self {
+            id: IPC_SUBSCRIPTION_ID + 1,
+            receiver: Arc::new(Mutex::new(receiver)),
+        }
+    }
+}
+
+impl Hash for AppCommandReceiverHandle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 impl IpcReceiverHandle {
     fn new(receiver: Receiver<IpcCommand>) -> Self {
         Self {
@@ -88,6 +109,7 @@ pub(super) struct Launcher {
     pub(super) launcher_window_id: Option<window::Id>,
     pub(super) preferences_window_id: Option<window::Id>,
     pub(super) monitor_size: Option<Size>,
+    pub(super) target_output_name: Option<String>,
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
@@ -112,6 +134,7 @@ pub(super) struct Launcher {
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
+    app_command_handle: AppCommandReceiverHandle,
 }
 
 #[to_layer_message(multi)]
@@ -123,6 +146,7 @@ pub(super) enum Message {
     QueryChanged(String),
     LaunchFirstMatch,
     LaunchIndex(usize),
+    AppCommand(AppCommand),
     IpcCommand(IpcCommand),
     KeyboardEvent(window::Id, iced::keyboard::Event),
     WindowEvent(window::Id, window::Event),
@@ -144,25 +168,17 @@ pub(super) enum Message {
 }
 
 impl Launcher {
-    pub(super) fn new() -> (Self, Task<Message>) {
+    pub(super) fn new(command_receiver: Receiver<AppCommand>) -> (Self, Task<Message>) {
         let layout_preferences = LauncherPreferences::load_from_env();
         let app_preferences = load_preferences();
         let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
         let preferences_editor = PreferencesEditor::from_preferences(&app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
-        let hidden_window_id = window::Id::unique();
-
         let (ipc_handle, startup_task) = match start_listener() {
             Ok(receiver) => (
                 IpcReceiverHandle::new(receiver),
-                Task::batch(vec![
-                    Task::done(Message::NewLayerShell {
-                        settings: launcher_hidden_surface_settings(&layout),
-                        id: hidden_window_id,
-                    }),
-                    Task::perform(async { load_apps() }, Message::AppsLoaded),
-                ]),
+                Task::perform(async { load_apps() }, Message::AppsLoaded),
             ),
             Err(error) => {
                 let (_tx, receiver) = mpsc::channel();
@@ -183,9 +199,10 @@ impl Launcher {
                 normalized_query: String::new(),
                 input_id,
                 results_scroll_id,
-                launcher_window_id: Some(hidden_window_id),
+                launcher_window_id: None,
                 preferences_window_id: None,
                 monitor_size: None,
+                target_output_name: None,
                 is_visible: false,
                 ignore_unfocus_until: None,
                 selected_rank: 0,
@@ -210,6 +227,7 @@ impl Launcher {
                 modifiers: Modifiers::default(),
                 icon_resolve_in_flight: false,
                 ipc_handle,
+                app_command_handle: AppCommandReceiverHandle::new(command_receiver),
             },
             startup_task,
         )
@@ -398,6 +416,10 @@ impl Launcher {
 
     pub(super) fn ipc_handle(&self) -> IpcReceiverHandle {
         self.ipc_handle.clone()
+    }
+
+    pub(super) fn app_command_handle(&self) -> AppCommandReceiverHandle {
+        self.app_command_handle.clone()
     }
 
     pub(super) fn update_layout(&mut self, monitor_size: Option<Size>) -> Task<Message> {

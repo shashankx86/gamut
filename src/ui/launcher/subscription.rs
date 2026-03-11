@@ -1,4 +1,5 @@
-use super::{IpcReceiverHandle, Launcher, Message};
+use super::{AppCommandReceiverHandle, IpcReceiverHandle, Launcher, Message};
+use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
 use iced::futures::{SinkExt, StreamExt, channel::mpsc, stream::BoxStream};
 use iced::{Event, Subscription, event, stream, time, window};
@@ -19,6 +20,7 @@ impl Launcher {
             }),
             window::open_events().map(Message::WindowOpened),
             window::close_events().map(Message::WindowClosed),
+            Subscription::run_with(self.app_command_handle(), app_command_stream),
             Subscription::run_with(self.ipc_handle(), ipc_command_stream),
         ];
 
@@ -59,6 +61,39 @@ fn ipc_command_stream(handle: &IpcReceiverHandle) -> BoxStream<'static, Message>
 
         while let Some(command) = rx.next().await {
             let _ = output.send(Message::IpcCommand(command)).await;
+        }
+    })
+    .boxed()
+}
+
+fn app_command_stream(handle: &AppCommandReceiverHandle) -> BoxStream<'static, Message> {
+    let receiver = handle.receiver.clone();
+
+    stream::channel(100, async move |mut output| {
+        let (tx, mut rx) = mpsc::unbounded::<AppCommand>();
+
+        std::thread::spawn(move || {
+            loop {
+                let command = {
+                    let Ok(guard) = receiver.lock() else {
+                        break;
+                    };
+                    guard.recv()
+                };
+
+                match command {
+                    Ok(command) => {
+                        if tx.unbounded_send(command).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        while let Some(command) = rx.next().await {
+            let _ = output.send(Message::AppCommand(command)).await;
         }
     })
     .boxed()

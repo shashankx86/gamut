@@ -7,7 +7,10 @@ mod linux;
 mod unsupported;
 
 use std::error::Error;
+use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
+
+use crate::core::app_command::AppCommand;
 
 type DynError = Box<dyn Error>;
 
@@ -29,14 +32,14 @@ impl TrayService {
     }
 }
 
-pub(crate) fn start() -> Result<TrayService, DynError> {
+pub(crate) fn start(command_tx: Sender<AppCommand>) -> Result<TrayService, DynError> {
     #[cfg(target_os = "linux")]
     {
-        linux::start()
+        linux::start(command_tx)
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        unsupported::start()
+        unsupported::start(command_tx)
     }
 }

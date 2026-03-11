@@ -124,7 +124,7 @@ fn read_command_from<R: BufRead>(reader: &mut R) -> Option<IpcCommand> {
 
 #[cfg(test)]
 mod tests {
-    use super::{IpcCommand, read_command_from, start_listener_at, write_command_to};
+    use super::{read_command_from, start_listener_at, write_command_to, IpcCommand};
     use std::fs;
     use std::io::{self, BufReader, Cursor};
     use std::path::PathBuf;
@@ -151,7 +151,13 @@ mod tests {
     fn write_command_serializes_wire_protocol() {
         let mut buffer = Vec::new();
 
-        write_command_to(&mut buffer, IpcCommand::Toggle).expect("toggle should serialize");
+        write_command_to(
+            &mut buffer,
+            IpcCommand::Toggle {
+                target_output: None,
+            },
+        )
+        .expect("toggle should serialize");
 
         assert_eq!(buffer, b"toggle\n");
     }

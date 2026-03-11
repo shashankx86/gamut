@@ -1,7 +1,7 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IpcCommand {
-    Show,
-    Toggle,
+    Show { target_output: Option<String> },
+    Toggle { target_output: Option<String> },
     OpenPreferences,
     ReloadPreferences,
     Quit,
@@ -9,21 +9,30 @@ pub enum IpcCommand {
 }
 
 impl IpcCommand {
-    pub(super) fn as_wire(self) -> &'static str {
+    pub(super) fn as_wire(&self) -> String {
         match self {
-            Self::Show => "show\n",
-            Self::Toggle => "toggle\n",
-            Self::OpenPreferences => "open-preferences\n",
-            Self::ReloadPreferences => "reload-preferences\n",
-            Self::Quit => "quit\n",
-            Self::Ping => "ping\n",
+            Self::Show { target_output } => serialize_command("show", target_output.as_deref()),
+            Self::Toggle { target_output } => serialize_command("toggle", target_output.as_deref()),
+            Self::OpenPreferences => "open-preferences\n".to_string(),
+            Self::ReloadPreferences => "reload-preferences\n".to_string(),
+            Self::Quit => "quit\n".to_string(),
+            Self::Ping => "ping\n".to_string(),
         }
     }
 
     pub(super) fn from_wire(line: &str) -> Option<Self> {
-        match line.trim() {
-            "show" => Some(Self::Show),
-            "toggle" => Some(Self::Toggle),
+        let trimmed = line.trim();
+        let (command, target_output) =
+            trimmed
+                .split_once('\t')
+                .map_or((trimmed, None), |(command, output)| {
+                    let output = (!output.is_empty()).then(|| output.to_string());
+                    (command, output)
+                });
+
+        match command {
+            "show" => Some(Self::Show { target_output }),
+            "toggle" => Some(Self::Toggle { target_output }),
             "open-preferences" => Some(Self::OpenPreferences),
             "reload-preferences" => Some(Self::ReloadPreferences),
             "quit" => Some(Self::Quit),
@@ -33,14 +42,37 @@ impl IpcCommand {
     }
 }
 
+fn serialize_command(command: &str, target_output: Option<&str>) -> String {
+    match target_output {
+        Some(output) => format!("{command}\t{output}\n"),
+        None => format!("{command}\n"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::IpcCommand;
 
     #[test]
     fn parses_wire_commands() {
-        assert_eq!(IpcCommand::from_wire("show"), Some(IpcCommand::Show));
-        assert_eq!(IpcCommand::from_wire("toggle"), Some(IpcCommand::Toggle));
+        assert_eq!(
+            IpcCommand::from_wire("show"),
+            Some(IpcCommand::Show {
+                target_output: None,
+            })
+        );
+        assert_eq!(
+            IpcCommand::from_wire("toggle"),
+            Some(IpcCommand::Toggle {
+                target_output: None,
+            })
+        );
+        assert_eq!(
+            IpcCommand::from_wire("toggle\tDP-1"),
+            Some(IpcCommand::Toggle {
+                target_output: Some("DP-1".to_string()),
+            })
+        );
         assert_eq!(
             IpcCommand::from_wire("open-preferences"),
             Some(IpcCommand::OpenPreferences),
@@ -56,8 +88,27 @@ mod tests {
 
     #[test]
     fn writes_wire_commands() {
-        assert_eq!(IpcCommand::Show.as_wire(), "show\n");
-        assert_eq!(IpcCommand::Toggle.as_wire(), "toggle\n");
+        assert_eq!(
+            IpcCommand::Show {
+                target_output: None,
+            }
+            .as_wire(),
+            "show\n"
+        );
+        assert_eq!(
+            IpcCommand::Toggle {
+                target_output: None,
+            }
+            .as_wire(),
+            "toggle\n"
+        );
+        assert_eq!(
+            IpcCommand::Toggle {
+                target_output: Some("DP-1".to_string()),
+            }
+            .as_wire(),
+            "toggle\tDP-1\n"
+        );
         assert_eq!(IpcCommand::OpenPreferences.as_wire(), "open-preferences\n",);
         assert_eq!(
             IpcCommand::ReloadPreferences.as_wire(),

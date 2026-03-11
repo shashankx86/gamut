@@ -1,14 +1,15 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::preferences::{normalize_hex_color, shortcut_preferences_from_editor};
 use super::{Launcher, Message, ShortcutAction, ThemeColorField};
+use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
 use crate::core::preferences::{
     LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
 };
-use iced::keyboard::{self, Key, Modifiers, key::Named};
+use iced::keyboard::{self, key::Named, Key, Modifiers};
 use iced::widget;
 use iced::widget::scrollable;
-use iced::{Task, window};
+use iced::{window, Task};
 use log::{error, info};
 use std::time::{Duration, Instant};
 
@@ -40,6 +41,7 @@ impl Launcher {
                 }
             }
             Message::LaunchIndex(index) => self.launch(index),
+            Message::AppCommand(command) => self.handle_app_command(command),
             Message::IpcCommand(command) => self.handle_ipc_command(command),
             Message::WindowOpened(id) => self.on_window_opened(id),
             Message::WindowClosed(id) => self.on_window_closed(id),
@@ -81,19 +83,29 @@ impl Launcher {
     }
 
     fn handle_ipc_command(&mut self, command: IpcCommand) -> Task<Message> {
+        match AppCommand::from_ipc(command) {
+            Some(command) => self.handle_app_command(command),
+            None => Task::none(),
+        }
+    }
+
+    fn handle_app_command(&mut self, command: AppCommand) -> Task<Message> {
         match command {
-            IpcCommand::Show => self.show_launcher(),
-            IpcCommand::Toggle => {
+            AppCommand::ShowLauncher { target_output } => {
+                self.target_output_name = target_output;
+                self.show_launcher()
+            }
+            AppCommand::ToggleLauncher { target_output } => {
+                self.target_output_name = target_output;
                 if self.is_visible {
                     self.hide_launcher()
                 } else {
                     self.show_launcher()
                 }
             }
-            IpcCommand::OpenPreferences => self.open_preferences_window(),
-            IpcCommand::ReloadPreferences => self.reload_preferences_from_disk(),
-            IpcCommand::Quit => iced::exit(),
-            IpcCommand::Ping => Task::none(),
+            AppCommand::OpenPreferences => self.open_preferences_window(),
+            AppCommand::ReloadPreferences => self.reload_preferences_from_disk(),
+            AppCommand::Quit => iced::exit(),
         }
     }
 
