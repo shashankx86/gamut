@@ -1,7 +1,7 @@
 mod constants;
 mod launcher;
 mod layout;
-mod preferences_app;
+mod preferences;
 mod styles;
 mod surface;
 mod theme;
@@ -37,7 +37,7 @@ pub fn run_daemon() -> Result<(), DynError> {
 }
 
 pub fn run_preferences() -> Result<(), DynError> {
-    preferences_app::run()
+    preferences::run()
 }
 
 fn launcher_theme(_state: &Launcher, _id: window::Id) -> Theme {
