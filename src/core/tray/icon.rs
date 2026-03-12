@@ -1,3 +1,4 @@
+use crate::core::assets::{AssetTheme, tray_icon_svg};
 #[cfg(target_os = "linux")]
 use resvg::tiny_skia::{Pixmap, Transform};
 #[cfg(target_os = "linux")]
@@ -9,15 +10,10 @@ use tray_icon::Icon;
 
 #[cfg(target_os = "linux")]
 const TRAY_ICON_SIZE: u32 = 32;
-#[cfg(target_os = "linux")]
-const TRAY_ICON_SVG: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/icons/gamut-transparent-dark.svg"
-));
 
 #[cfg(target_os = "linux")]
-pub(super) fn load() -> Result<Icon, Box<dyn std::error::Error>> {
-    let tree = usvg::Tree::from_data(TRAY_ICON_SVG, &usvg::Options::default())?;
+pub(super) fn load(theme: AssetTheme) -> Result<Icon, Box<dyn std::error::Error>> {
+    let tree = usvg::Tree::from_data(tray_icon_svg(theme), &usvg::Options::default())?;
     let svg_size = tree.size();
     let scale =
         (TRAY_ICON_SIZE as f32 / svg_size.width()).min(TRAY_ICON_SIZE as f32 / svg_size.height());

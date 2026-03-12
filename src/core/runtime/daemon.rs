@@ -1,5 +1,6 @@
 use super::{DAEMON_START_DELAY, DAEMON_START_RETRIES, DynError};
 use crate::core::ipc::{self, IpcCommand};
+use crate::core::preferences::load_preferences;
 use crate::core::tray;
 use crate::ui;
 use log::{debug, info, warn};
@@ -16,7 +17,7 @@ pub(super) fn run_daemon() -> Result<(), DynError> {
     }
 
     let (command_tx, command_rx) = std::sync::mpsc::channel();
-    let _tray_service = tray::start(command_tx)?;
+    let _tray_service = tray::start(command_tx, load_preferences())?;
     info!("tray service started");
     ui::run_daemon(command_rx)
 }

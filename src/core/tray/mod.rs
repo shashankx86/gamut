@@ -11,6 +11,7 @@ use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 
 use crate::core::app_command::AppCommand;
+use crate::core::preferences::AppPreferences;
 
 type DynError = Box<dyn Error>;
 
@@ -32,14 +33,17 @@ impl TrayService {
     }
 }
 
-pub(crate) fn start(command_tx: Sender<AppCommand>) -> Result<TrayService, DynError> {
+pub(crate) fn start(
+    command_tx: Sender<AppCommand>,
+    preferences: AppPreferences,
+) -> Result<TrayService, DynError> {
     #[cfg(target_os = "linux")]
     {
-        linux::start(command_tx)
+        linux::start(command_tx, preferences)
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        unsupported::start(command_tx)
+        unsupported::start(command_tx, preferences)
     }
 }

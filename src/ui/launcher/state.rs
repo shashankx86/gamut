@@ -193,9 +193,9 @@ pub(super) fn move_selection(selected_rank: usize, item_count: usize, offset: is
 #[cfg(test)]
 mod tests {
     use super::{
-        animate_results, clamp_scroll_offset, is_manual_expansion_in_progress, move_selection,
-        render_range_for_viewport, results_target, scroll_offset_for_selection,
-        scroll_start_for_offset, spacer_height_for_rows, SurfaceResize,
+        SurfaceResize, animate_results, clamp_scroll_offset, is_manual_expansion_in_progress,
+        move_selection, render_range_for_viewport, results_target, scroll_offset_for_selection,
+        scroll_start_for_offset, spacer_height_for_rows,
     };
     use crate::ui::layout::LauncherLayout;
 

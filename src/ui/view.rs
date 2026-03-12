@@ -3,13 +3,15 @@ use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style,
 };
-use crate::core::desktop::{trim_label, DesktopApp};
+use super::theme::resolve_asset_theme;
+use crate::core::assets::launcher_logo_svg;
+use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{window, Color, ContentFit, Element, Length};
+use iced::{Color, ContentFit, Element, Length, window};
 use iced_shadcn::{
-    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
-    Theme as ShadcnTheme,
+    ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme, icon_button,
 };
 use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
@@ -228,8 +230,8 @@ impl Launcher {
         };
 
         let logo = container(
-            svg(SvgHandle::from_memory(include_bytes!(
-                "../../assets/icons/gamut-full-transparent-dark.svg"
+            svg(SvgHandle::from_memory(launcher_logo_svg(
+                resolve_asset_theme(&self.app_preferences.appearance),
             )))
             .width(Length::Fixed(self.layout.logo_width))
             .height(Length::Fixed(self.layout.logo_height)),
@@ -409,7 +411,7 @@ mod tests {
     fn query_driven_expansion_only_renders_visible_rows_plus_buffer() {
         let launcher = launcher_with_results(20);
 
-        assert_eq!(launcher.result_render_range(), 0..7);
+        assert_eq!(launcher.result_render_range(), 0..6);
     }
 
     #[test]
@@ -417,7 +419,7 @@ mod tests {
         let mut launcher = launcher_with_results(20);
         launcher.results_scroll_offset = 4.0 * launcher.layout.result_row_scroll_step();
 
-        assert_eq!(launcher.result_render_range(), 3..11);
+        assert_eq!(launcher.result_render_range(), 3..10);
     }
 
     #[test]

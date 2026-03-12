@@ -1,4 +1,5 @@
 pub(crate) mod app_command;
+pub(crate) mod assets;
 pub(crate) mod cli;
 pub(crate) mod desktop;
 pub(crate) mod display_target;

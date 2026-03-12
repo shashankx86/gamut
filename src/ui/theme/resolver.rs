@@ -1,4 +1,5 @@
 use super::palette::{ResolvedAppearance, ThemePalette};
+use crate::core::assets::{AssetTheme, asset_theme};
 use crate::core::preferences::{
     AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
 };
@@ -13,6 +14,10 @@ pub(in crate::ui) fn resolve_theme(preferences: &AppearancePreferences) -> Theme
 
 pub(in crate::ui) fn resolve_appearance(preferences: &AppearancePreferences) -> ResolvedAppearance {
     resolve_palette(preferences).appearance
+}
+
+pub(in crate::ui) fn resolve_asset_theme(preferences: &AppearancePreferences) -> AssetTheme {
+    asset_theme(preferences)
 }
 
 fn resolve_palette(preferences: &AppearancePreferences) -> ThemePalette {
