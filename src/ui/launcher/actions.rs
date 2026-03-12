@@ -29,7 +29,7 @@ impl Launcher {
 
         self.clear_window_state();
         self.is_visible = true;
-        self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
+        self.arm_unfocus_guard();
 
         self.recreate_launcher_surface()
     }
@@ -99,5 +99,9 @@ impl Launcher {
     pub(super) fn should_ignore_unfocus(&self) -> bool {
         self.ignore_unfocus_until
             .is_some_and(|deadline| Instant::now() < deadline)
+    }
+
+    pub(super) fn arm_unfocus_guard(&mut self) {
+        self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
     }
 }
