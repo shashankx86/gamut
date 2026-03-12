@@ -124,7 +124,7 @@ fn read_command_from<R: BufRead>(reader: &mut R) -> Option<IpcCommand> {
 
 #[cfg(test)]
 mod tests {
-    use super::{read_command_from, start_listener_at, write_command_to, IpcCommand};
+    use super::{IpcCommand, read_command_from, start_listener_at, write_command_to};
     use std::fs;
     use std::io::{self, BufReader, Cursor};
     use std::path::PathBuf;

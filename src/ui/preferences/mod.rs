@@ -1,4 +1,5 @@
 mod general;
+mod model;
 mod shortcuts;
 mod tabs;
 mod theme;
@@ -6,6 +7,8 @@ mod widgets;
 
 use crate::core::ipc::{IpcCommand, send_command};
 use crate::core::preferences::{AppPreferences, load_preferences, save_preferences};
+use general::GeneralActions;
+use model::{ThemeColorField, ThemeEditorState, update_theme_scheme_color};
 use shortcuts::ShortcutEditor;
 use tabs::PreferencesTab;
 
@@ -15,19 +18,21 @@ const WINDOW_HEIGHT: f32 = 520.0;
 struct PreferencesApp {
     preferences: AppPreferences,
     active_tab: PreferencesTab,
+    theme_editor: ThemeEditorState,
     shortcut_editor: ShortcutEditor,
 }
 
 impl PreferencesApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        theme::apply_theme(&cc.egui_ctx);
-
         let prefs = load_preferences();
+        theme::apply_theme(&cc.egui_ctx, &prefs);
+        let theme_editor = ThemeEditorState::from_preferences(&prefs);
         let editor = ShortcutEditor::from_shortcuts(&prefs.shortcuts);
 
         Self {
             preferences: prefs,
             active_tab: PreferencesTab::General,
+            theme_editor,
             shortcut_editor: editor,
         }
     }
@@ -40,17 +45,41 @@ impl PreferencesApp {
 
         let _ = send_command(IpcCommand::ReloadPreferences);
     }
+
+    fn update_theme_color(
+        &mut self,
+        scheme: crate::core::preferences::ThemeSchemeId,
+        field: ThemeColorField,
+        value: String,
+    ) {
+        match update_theme_scheme_color(
+            &mut self.preferences,
+            &mut self.theme_editor,
+            scheme,
+            field,
+            value,
+        ) {
+            Ok(()) => {
+                self.theme_editor.set_theme_error(None);
+                self.persist();
+            }
+            Err(error) => self.theme_editor.set_theme_error(Some(error)),
+        }
+    }
 }
 
 impl eframe::App for PreferencesApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        theme::apply_theme(ctx, &self.preferences);
+        let tokens = theme::tokens_from_preferences(&self.preferences);
+
         // Sidebar
         egui::SidePanel::left("preferences_sidebar")
             .resizable(false)
             .exact_width(140.0)
             .frame(
                 egui::Frame::new()
-                    .fill(theme::BASE)
+                    .fill(tokens.base)
                     .inner_margin(egui::Margin::symmetric(8, 0)),
             )
             .show(ctx, |ui| {
@@ -61,14 +90,14 @@ impl eframe::App for PreferencesApp {
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
-                    .fill(theme::SURFACE)
+                    .fill(tokens.surface)
                     .inner_margin(egui::Margin {
                         left: 24,
                         right: 24,
                         top: 16,
                         bottom: 16,
                     })
-                    .stroke(egui::Stroke::new(1.0, theme::SEPARATOR)),
+                    .stroke(egui::Stroke::new(1.0, tokens.separator)),
             )
             .show(ctx, |ui| {
                 egui::ScrollArea::vertical()
@@ -77,8 +106,30 @@ impl eframe::App for PreferencesApp {
                         ui.set_min_width(ui.available_width());
                         match self.active_tab {
                             PreferencesTab::General => {
-                                if general::render_general(ui, &mut self.preferences) {
+                                let GeneralActions {
+                                    changed,
+                                    theme_updates,
+                                } = general::render_general(
+                                    ui,
+                                    &mut self.preferences,
+                                    &self.theme_editor,
+                                );
+
+                                for (scheme, field, value) in theme_updates {
+                                    self.update_theme_color(scheme, field, value);
+                                }
+
+                                if changed {
                                     self.persist();
+                                }
+
+                                if let Some(error) = self.theme_editor.theme_error() {
+                                    ui.add_space(10.0);
+                                    ui.label(
+                                        egui::RichText::new(error)
+                                            .size(11.0)
+                                            .color(egui::Color32::from_rgb(255, 120, 100)),
+                                    );
                                 }
                             }
                             PreferencesTab::Shortcuts => {
@@ -119,8 +170,7 @@ pub(super) fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn configure_linux_backend() {
     #[cfg(target_os = "linux")]
     {
-        if std::env::var_os("WINIT_UNIX_BACKEND").is_none()
-            && std::env::var_os("DISPLAY").is_some()
+        if std::env::var_os("WINIT_UNIX_BACKEND").is_none() && std::env::var_os("DISPLAY").is_some()
         {
             unsafe {
                 std::env::set_var("WINIT_UNIX_BACKEND", "x11");

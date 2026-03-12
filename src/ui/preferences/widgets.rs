@@ -1,4 +1,4 @@
-use egui::{Color32, CornerRadius, Sense, Stroke, StrokeKind, Ui, Vec2, pos2, RichText};
+use egui::{Color32, CornerRadius, RichText, Sense, Stroke, StrokeKind, Ui, Vec2, pos2};
 
 use super::theme;
 
@@ -8,7 +8,7 @@ pub fn section_heading(ui: &mut Ui, title: &str) {
     ui.label(
         RichText::new(title.to_ascii_uppercase())
             .size(10.5)
-            .color(theme::MUTED)
+            .color(theme::tokens(ui).muted)
             .strong(),
     );
     ui.add_space(2.0);
@@ -18,7 +18,11 @@ pub fn section_heading(ui: &mut Ui, title: &str) {
 pub fn setting_row(ui: &mut Ui, label: &str, add_right: impl FnOnce(&mut Ui)) {
     ui.horizontal(|ui| {
         ui.set_min_height(28.0);
-        ui.label(RichText::new(label).size(13.0).color(theme::TEXT_SECONDARY));
+        ui.label(
+            RichText::new(label)
+                .size(13.0)
+                .color(theme::tokens(ui).text_secondary),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), add_right);
     });
 }
@@ -34,23 +38,27 @@ pub fn toggle_switch(ui: &mut Ui, on: &mut bool) -> bool {
         *on = !*on;
     }
 
-    let anim_t = ui
-        .ctx()
-        .animate_bool_with_time(response.id, *on, 0.15);
+    let anim_t = ui.ctx().animate_bool_with_time(response.id, *on, 0.15);
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
         let radius = (rect.height() / 2.0) as u8;
         let rounding = CornerRadius::same(radius);
+        let tokens = theme::tokens(ui);
 
         // Track
         let track_color = Color32::from_rgb(
-            lerp_u8(theme::SURFACE_RAISED.r(), theme::ACCENT.r(), anim_t),
-            lerp_u8(theme::SURFACE_RAISED.g(), theme::ACCENT.g(), anim_t),
-            lerp_u8(theme::SURFACE_RAISED.b(), theme::ACCENT.b(), anim_t),
+            lerp_u8(tokens.surface_raised.r(), tokens.accent.r(), anim_t),
+            lerp_u8(tokens.surface_raised.g(), tokens.accent.g(), anim_t),
+            lerp_u8(tokens.surface_raised.b(), tokens.accent.b(), anim_t),
         );
         painter.rect_filled(rect, rounding, track_color);
-        painter.rect_stroke(rect, rounding, Stroke::new(1.0, theme::BORDER), StrokeKind::Outside);
+        painter.rect_stroke(
+            rect,
+            rounding,
+            Stroke::new(1.0, tokens.border),
+            StrokeKind::Outside,
+        );
 
         // Thumb
         let thumb_radius = (rect.height() - 6.0) / 2.0;
@@ -69,9 +77,10 @@ pub fn toggle_switch(ui: &mut Ui, on: &mut bool) -> bool {
 pub fn thin_separator(ui: &mut Ui) {
     let rect = ui.available_rect_before_wrap();
     let y = rect.top();
+    let tokens = theme::tokens(ui);
     ui.painter().line_segment(
         [pos2(rect.left(), y), pos2(rect.right(), y)],
-        Stroke::new(1.0, theme::SEPARATOR),
+        Stroke::new(1.0, tokens.separator),
     );
     ui.add_space(1.0);
 }

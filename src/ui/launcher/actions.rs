@@ -1,7 +1,7 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use iced::{window, Task};
+use iced::{Task, window};
 use log::error;
 use std::env;
 use std::process::Command;
@@ -94,17 +94,6 @@ impl Launcher {
         }
 
         Task::none()
-    }
-
-    pub(super) fn close_preferences_window(&mut self) -> Task<Message> {
-        self.preferences_editor.set_shortcut_error(None);
-        self.preferences_editor.set_theme_error(None);
-
-        if let Some(id) = self.preferences_window_id.take() {
-            Task::done(Message::RemoveWindow(id))
-        } else {
-            Task::none()
-        }
     }
 
     pub(super) fn should_ignore_unfocus(&self) -> bool {

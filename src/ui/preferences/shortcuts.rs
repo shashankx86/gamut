@@ -3,43 +3,13 @@ use egui::{Button, Color32, CornerRadius, Key, Modifiers, RichText, Stroke, Stro
 use crate::core::preferences::{ShortcutBinding, ShortcutPreferences};
 use std::str::FromStr;
 
+use super::model::{ShortcutAction, shortcut_preferences_from_values};
 use super::theme;
 use super::widgets::section_heading;
 
-// ── Shortcut actions (mirrors launcher/preferences.rs ShortcutAction) ──────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ShortcutAction {
-    LaunchSelected,
-    ExpandOrMoveDown,
-    MoveUp,
-    CloseLauncher,
-}
-
 impl ShortcutAction {
-    const ALL: [Self; 4] = [
-        Self::LaunchSelected,
-        Self::ExpandOrMoveDown,
-        Self::MoveUp,
-        Self::CloseLauncher,
-    ];
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::LaunchSelected => "Launch selected",
-            Self::ExpandOrMoveDown => "Expand / move down",
-            Self::MoveUp => "Move up",
-            Self::CloseLauncher => "Close launcher",
-        }
-    }
-
     fn description(self) -> &'static str {
-        match self {
-            Self::LaunchSelected => "Runs the highlighted application",
-            Self::ExpandOrMoveDown => "Expands the list or moves selection down",
-            Self::MoveUp => "Moves selection upward",
-            Self::CloseLauncher => "Hides the launcher window",
-        }
+        self.helper_text()
     }
 
     fn get_binding(self, shortcuts: &ShortcutPreferences) -> &ShortcutBinding {
@@ -92,7 +62,7 @@ impl ShortcutEditor {
         action: ShortcutAction,
         shortcuts: &ShortcutPreferences,
     ) -> ShortcutBinding {
-        parse_binding(self.buffer_ref(action), action)
+        ShortcutBinding::from_str(self.buffer_ref(action))
             .unwrap_or_else(|_| action.get_binding(shortcuts).clone())
     }
 
@@ -136,62 +106,26 @@ impl ShortcutEditor {
     /// Attempt to parse and validate all buffers into a `ShortcutPreferences`.
     /// Returns `Ok(shortcuts)` on success or `Err(msg)` on validation failure.
     fn try_apply(&self) -> Result<ShortcutPreferences, String> {
-        let shortcuts = ShortcutPreferences {
-            launch_selected: parse_binding(
-                self.buffer_ref(ShortcutAction::LaunchSelected),
+        shortcut_preferences_from_values(&[
+            (
                 ShortcutAction::LaunchSelected,
-            )?,
-            expand_or_move_down: parse_binding(
-                self.buffer_ref(ShortcutAction::ExpandOrMoveDown),
-                ShortcutAction::ExpandOrMoveDown,
-            )?,
-            move_up: parse_binding(
-                self.buffer_ref(ShortcutAction::MoveUp),
-                ShortcutAction::MoveUp,
-            )?,
-            close_launcher: parse_binding(
-                self.buffer_ref(ShortcutAction::CloseLauncher),
-                ShortcutAction::CloseLauncher,
-            )?,
-        };
-
-        // Check for duplicate bindings
-        let entries: [(ShortcutAction, &ShortcutBinding); 4] = [
-            (ShortcutAction::LaunchSelected, &shortcuts.launch_selected),
+                self.buffer_ref(ShortcutAction::LaunchSelected).to_string(),
+            ),
             (
                 ShortcutAction::ExpandOrMoveDown,
-                &shortcuts.expand_or_move_down,
+                self.buffer_ref(ShortcutAction::ExpandOrMoveDown)
+                    .to_string(),
             ),
-            (ShortcutAction::MoveUp, &shortcuts.move_up),
-            (ShortcutAction::CloseLauncher, &shortcuts.close_launcher),
-        ];
-
-        for (i, (a_action, a_bind)) in entries.iter().enumerate() {
-            for (b_action, b_bind) in entries.iter().skip(i + 1) {
-                if same_binding(a_bind, b_bind) {
-                    return Err(format!(
-                        "\"{}\" conflicts with \"{}\"",
-                        a_action.label(),
-                        b_action.label()
-                    ));
-                }
-            }
-        }
-
-        Ok(shortcuts)
+            (
+                ShortcutAction::MoveUp,
+                self.buffer_ref(ShortcutAction::MoveUp).to_string(),
+            ),
+            (
+                ShortcutAction::CloseLauncher,
+                self.buffer_ref(ShortcutAction::CloseLauncher).to_string(),
+            ),
+        ])
     }
-}
-
-fn parse_binding(value: &str, action: ShortcutAction) -> Result<ShortcutBinding, String> {
-    ShortcutBinding::from_str(value).map_err(|e| format!("{}: {e}", action.label()))
-}
-
-fn same_binding(a: &ShortcutBinding, b: &ShortcutBinding) -> bool {
-    a.ctrl == b.ctrl
-        && a.alt == b.alt
-        && a.shift == b.shift
-        && a.super_key == b.super_key
-        && a.normalized_key() == b.normalized_key()
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -203,6 +137,7 @@ pub fn render_shortcuts(
     editor: &mut ShortcutEditor,
 ) -> bool {
     let mut changed = false;
+    let tokens = theme::tokens(ui);
 
     if let Some(result) = editor.capture_from_input(ui.ctx()) {
         match result {
@@ -223,7 +158,7 @@ pub fn render_shortcuts(
     ui.label(
         RichText::new("Click reassign, then press the shortcut you want to save.")
             .size(11.0)
-            .color(theme::TEXT_SECONDARY),
+            .color(tokens.text_secondary),
     );
     ui.add_space(6.0);
 
@@ -249,10 +184,10 @@ pub fn render_shortcuts(
         let btn = egui::Button::new(
             RichText::new("Restore Defaults")
                 .size(11.0)
-                .color(theme::TEXT_SECONDARY),
+                .color(tokens.text_secondary),
         )
-        .fill(theme::SURFACE)
-        .stroke(Stroke::new(1.0, theme::BORDER))
+        .fill(tokens.surface)
+        .stroke(Stroke::new(1.0, tokens.border))
         .corner_radius(4);
 
         if ui.add(btn).clicked() {
@@ -274,17 +209,18 @@ fn shortcut_edit_row(
 ) -> bool {
     let current_binding = editor.preview_binding(action, shortcuts);
     let is_capturing = editor.is_capturing(action);
+    let tokens = theme::tokens(ui);
 
     // Row container
     egui::Frame::new()
         .fill(if is_capturing {
-            theme::SURFACE
+            tokens.surface
         } else {
-            theme::BASE
+            tokens.base
         })
         .corner_radius(4)
         .stroke(if is_capturing {
-            Stroke::new(1.0, theme::ACCENT)
+            Stroke::new(1.0, tokens.accent)
         } else {
             Stroke::NONE
         })
@@ -297,7 +233,7 @@ fn shortcut_edit_row(
                 ui.label(
                     RichText::new(action.label())
                         .size(12.5)
-                        .color(theme::TEXT_PRIMARY)
+                        .color(tokens.text_primary)
                         .strong(),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -310,7 +246,7 @@ fn shortcut_edit_row(
             ui.label(
                 RichText::new(action.description())
                     .size(10.5)
-                    .color(theme::MUTED),
+                    .color(tokens.muted),
             );
 
             ui.add_space(4.0);
@@ -323,19 +259,19 @@ fn shortcut_edit_row(
                         "Reassign"
                     })
                     .size(11.5)
-                    .color(theme::TEXT_PRIMARY),
+                    .color(tokens.text_primary),
                 )
                 .fill(if is_capturing {
-                    theme::ACCENT_DIM
+                    tokens.accent_dim
                 } else {
-                    theme::SURFACE_RAISED
+                    tokens.surface_raised
                 })
                 .stroke(Stroke::new(
                     1.0,
                     if is_capturing {
-                        theme::ACCENT
+                        tokens.accent
                     } else {
-                        theme::BORDER
+                        tokens.border
                     },
                 ))
                 .corner_radius(4)
@@ -352,9 +288,9 @@ fn shortcut_edit_row(
                 };
 
                 ui.label(RichText::new(hint).size(10.5).color(if is_capturing {
-                    theme::ACCENT
+                    tokens.accent
                 } else {
-                    theme::MUTED
+                    tokens.muted
                 }));
             });
 
@@ -363,7 +299,7 @@ fn shortcut_edit_row(
                 ui.label(
                     RichText::new("Hold Ctrl / Alt / Shift, then press the final key.")
                         .size(10.0)
-                        .color(theme::TEXT_SECONDARY),
+                        .color(tokens.text_secondary),
                 );
             }
         });
@@ -392,12 +328,13 @@ fn render_binding_badges(ui: &mut Ui, binding: &ShortcutBinding) {
 }
 
 fn key_badge(ui: &mut Ui, label: &str) {
+    let tokens = theme::tokens(ui);
     let display = pretty_key(label);
     let galley = ui.fonts(|f| {
         f.layout_no_wrap(
             display.clone(),
             egui::FontId::proportional(10.0),
-            theme::TEXT_PRIMARY,
+            tokens.text_primary,
         )
     });
 
@@ -411,11 +348,11 @@ fn key_badge(ui: &mut Ui, label: &str) {
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
         let rounding = CornerRadius::same(3);
-        painter.rect_filled(rect, rounding, theme::SURFACE_RAISED);
+        painter.rect_filled(rect, rounding, tokens.surface_raised);
         painter.rect_stroke(
             rect,
             rounding,
-            Stroke::new(0.5, theme::BORDER),
+            Stroke::new(0.5, tokens.border),
             StrokeKind::Outside,
         );
         painter.text(
@@ -423,7 +360,7 @@ fn key_badge(ui: &mut Ui, label: &str) {
             egui::Align2::CENTER_CENTER,
             &display,
             egui::FontId::proportional(10.0),
-            theme::TEXT_PRIMARY,
+            tokens.text_primary,
         );
     }
 }

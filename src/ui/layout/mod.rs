@@ -16,18 +16,21 @@ mod tests {
 
     #[test]
     fn reference_monitor_preserves_current_layout() {
+        let preferences = AppPreferences::default();
         let layout = LauncherLayout::from_monitor_size(
             Some(Size::new(1920.0, 1080.0)),
             &LauncherPreferences::default(),
-            &AppPreferences::default(),
+            &preferences,
         );
 
         approx_eq(layout.panel_width, 825.0);
         approx_eq(layout.results_height, 300.0);
         approx_eq(layout.results_animation_speed, 0.25);
         assert_eq!(layout.top_margin, 120);
-        assert_eq!(layout.collapsed_surface_height(), 103);
-        assert_eq!(layout.expanded_surface_height(), 403);
+        assert_eq!(layout.panel_radius, 10.0);
+        assert_eq!(layout.item_radius, 8.0);
+        assert_eq!(layout.collapsed_surface_height(), 108);
+        assert_eq!(layout.expanded_surface_height(), 408);
     }
 
     #[test]

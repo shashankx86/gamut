@@ -1,4 +1,4 @@
-use crate::core::cli::{parse_command, print_help, print_version, CliCommand, CliMode};
+use crate::core::cli::{CliCommand, CliMode, parse_command, print_help, print_version};
 use crate::core::display_target::active_output_name;
 use crate::core::ipc::{self, IpcCommand};
 use crate::core::logging;

@@ -2,7 +2,11 @@ use super::model::AppPreferences;
 use std::env;
 use std::fs;
 use std::io;
+use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const APP_CONFIG_DIR: &str = "gamut";
 const PREFERENCES_FILE: &str = "preferences.toml";
@@ -35,7 +39,16 @@ fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Re
     }
 
     let contents = toml::to_string_pretty(preferences).map_err(io::Error::other)?;
-    fs::write(path, contents)
+    let temp_path = temporary_preferences_path(path);
+    let mut file = temp_preferences_file(&temp_path)?;
+    file.write_all(contents.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+
+    fs::rename(&temp_path, path).or_else(|error| {
+        let _ = fs::remove_file(&temp_path);
+        Err(error)
+    })
 }
 
 fn config_home_dir() -> Option<PathBuf> {
@@ -46,6 +59,31 @@ fn config_home_dir() -> Option<PathBuf> {
     env::var_os("HOME")
         .map(PathBuf::from)
         .map(|home| home.join(".config"))
+}
+
+fn temporary_preferences_path(path: &Path) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let suffix = format!("{}.{}.tmp", std::process::id(), nanos);
+
+    match path.file_name().and_then(|name| name.to_str()) {
+        Some(file_name) => path.with_file_name(format!("{file_name}.{suffix}")),
+        None => path.with_extension(suffix),
+    }
+}
+
+fn temp_preferences_file(path: &Path) -> io::Result<fs::File> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+
+    #[cfg(unix)]
+    {
+        options.mode(0o600);
+    }
+
+    options.open(path)
 }
 
 #[cfg(test)]
@@ -81,6 +119,27 @@ mod tests {
         let loaded = load_preferences_from_path(&path).expect("should load preferences");
 
         assert_eq!(loaded, preferences);
+
+        let _ = fs::remove_file(&path);
+        if let Some(parent) = path.parent() {
+            let _ = fs::remove_dir_all(parent);
+        }
+    }
+
+    #[test]
+    fn save_overwrites_existing_preferences_atomically() {
+        let path = unique_path();
+        let mut first = AppPreferences::default();
+        first.system.start_at_login = true;
+
+        let mut second = AppPreferences::default();
+        second.appearance.custom_radius = 24.0;
+
+        save_preferences_to_path(&first, &path).expect("should write first preferences");
+        save_preferences_to_path(&second, &path).expect("should replace preferences");
+
+        let loaded = load_preferences_from_path(&path).expect("should load replaced preferences");
+        assert_eq!(loaded, second);
 
         let _ = fs::remove_file(&path);
         if let Some(parent) = path.parent() {

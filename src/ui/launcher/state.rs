@@ -118,8 +118,8 @@ pub(super) fn scroll_start_for_selection(
 #[cfg(test)]
 mod tests {
     use super::{
-        animate_results, expansion_render_range, is_manual_expansion_in_progress, move_selection,
-        results_target, scroll_start_for_selection, spacer_height_for_rows, SurfaceResize,
+        SurfaceResize, animate_results, expansion_render_range, is_manual_expansion_in_progress,
+        move_selection, results_target, scroll_start_for_selection, spacer_height_for_rows,
     };
     use crate::ui::layout::LauncherLayout;
 

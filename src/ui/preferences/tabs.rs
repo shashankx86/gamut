@@ -29,19 +29,20 @@ impl PreferencesTab {
 pub fn render_sidebar(ui: &mut Ui, active: &mut PreferencesTab) {
     ui.vertical(|ui| {
         ui.add_space(8.0);
+        let tokens = theme::tokens(ui);
 
         for tab in PreferencesTab::ALL {
             let is_active = *active == tab;
 
             let bg = if is_active {
-                theme::SURFACE_RAISED
+                tokens.surface_raised
             } else {
                 Color32::TRANSPARENT
             };
             let text_color = if is_active {
-                theme::TEXT_PRIMARY
+                tokens.text_primary
             } else {
-                theme::MUTED
+                tokens.muted
             };
 
             let button = egui::Button::new(
@@ -51,7 +52,7 @@ pub fn render_sidebar(ui: &mut Ui, active: &mut PreferencesTab) {
             )
             .fill(bg)
             .stroke(if is_active {
-                Stroke::new(1.0, theme::BORDER)
+                Stroke::new(1.0, tokens.border)
             } else {
                 Stroke::NONE
             })

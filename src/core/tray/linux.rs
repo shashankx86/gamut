@@ -1,5 +1,5 @@
-use super::icon;
 use super::TrayService;
+use super::icon;
 use crate::core::app_command::AppCommand;
 use crate::core::display_target::active_output_name;
 use gtk::glib;

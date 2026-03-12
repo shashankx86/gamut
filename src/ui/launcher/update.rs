@@ -1,15 +1,10 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
-use super::preferences::{normalize_hex_color, shortcut_preferences_from_editor};
-use super::{Launcher, Message, ShortcutAction, ThemeColorField};
+use super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
-use crate::core::preferences::{
-    LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
-};
-use iced::keyboard::{self, key::Named, Key, Modifiers};
-use iced::widget;
-use iced::widget::scrollable;
-use iced::{window, Task};
+use iced::keyboard::{self, Key, Modifiers, key::Named};
+use iced::widget::{operation, scrollable};
+use iced::{Task, window};
 use log::{error, info};
 use std::time::{Duration, Instant};
 
@@ -49,24 +44,6 @@ impl Launcher {
             Message::KeyboardEvent(id, key_event) => self.handle_key_event(id, key_event),
             Message::WindowEvent(id, window_event) => self.handle_window_event(id, window_event),
             Message::MonitorSizeLoaded(size) => self.update_layout(size),
-            Message::PreferencesThemeSelected(theme) => self.update_theme_preference(theme),
-            Message::PreferencesRadiusSelected(radius) => self.update_radius_preference(radius),
-            Message::PreferencesSizeSelected(size) => self.update_size_preference(size),
-            Message::PreferencesPlacementSelected(placement) => {
-                self.update_placement_preference(placement)
-            }
-            Message::PreferencesCustomRadiusChanged(radius) => self.update_custom_radius(radius),
-            Message::PreferencesCustomTopMarginChanged(top_margin) => {
-                self.update_custom_top_margin(top_margin)
-            }
-            Message::PreferencesThemeColorChanged(field, value) => {
-                self.update_custom_theme_color(field, value)
-            }
-            Message::PreferencesShortcutChanged(action, value) => {
-                self.update_shortcut_binding(action, value)
-            }
-            Message::PreferencesCaptureShortcut(action) => self.capture_shortcut(action),
-            Message::PreferencesCloseRequested => self.close_preferences_window(),
             Message::SyncHighlightedRank { revision, rank } => {
                 self.sync_highlighted_rank(revision, rank);
                 Task::none()
@@ -123,14 +100,10 @@ impl Launcher {
 
             return Task::batch(vec![
                 monitor_size,
-                widget::operation::focus(self.input_id.clone()),
-                widget::operation::move_cursor_to_end(self.input_id.clone()),
+                operation::focus(self.input_id.clone()),
+                operation::move_cursor_to_end(self.input_id.clone()),
                 self.request_icon_resolution_for_visible(),
             ]);
-        }
-
-        if self.is_preferences_window(id) {
-            return widget::operation::focus(self.preferences_scroll_id.clone());
         }
 
         Task::none()
@@ -141,13 +114,6 @@ impl Launcher {
             self.launcher_window_id = None;
             self.is_visible = false;
             self.clear_window_state();
-        }
-
-        if self.is_preferences_window(id) {
-            self.preferences_window_id = None;
-            self.preferences_editor.set_theme_error(None);
-            self.preferences_editor.set_shortcut_error(None);
-            self.preferences_editor.set_save_error(None);
         }
 
         Task::none()
@@ -166,10 +132,6 @@ impl Launcher {
                 ..
             } => {
                 self.modifiers = modifiers;
-
-                if self.is_preferences_window(id) {
-                    return self.handle_preferences_key_press(key, modifiers, physical_key);
-                }
 
                 if self.is_launcher_window(id) && self.is_visible {
                     return self.handle_launcher_key_press(key, modifiers, physical_key);
@@ -243,38 +205,12 @@ impl Launcher {
         Task::none()
     }
 
-    fn handle_preferences_key_press(
-        &mut self,
-        key: Key,
-        modifiers: Modifiers,
-        physical_key: keyboard::key::Physical,
-    ) -> Task<Message> {
-        if matches!(key.as_ref(), Key::Named(Named::Escape)) {
-            return self.close_preferences_window();
-        }
-
-        if modifiers.control() && matches!(key.as_ref(), Key::Character("w" | "W")) {
-            return self.close_preferences_window();
-        }
-
-        if modifiers.control() && matches!(key.as_ref(), Key::Character("r" | "R")) {
-            return self.reload_preferences_from_disk();
-        }
-
-        if modifiers.control() && matches!(key.as_ref(), Key::Character("l" | "L")) {
-            return self.show_launcher();
-        }
-
-        let _ = physical_key;
-        Task::none()
-    }
-
     fn scroll_to_selected(&mut self, previous_rank: usize, force: bool) -> Task<Message> {
         if self.selected_result_index().is_none() {
             self.scroll_start_rank = 0;
             self.highlighted_rank = 0;
             return if force {
-                widget::operation::scroll_to(
+                operation::scroll_to(
                     self.results_scroll_id.clone(),
                     scrollable::AbsoluteOffset {
                         x: None,
@@ -301,7 +237,7 @@ impl Launcher {
         if did_scroll && self.selected_rank != previous_rank {
             self.highlighted_rank = previous_rank;
             let revision = self.selection_revision;
-            widget::operation::scroll_to(
+            operation::scroll_to(
                 self.results_scroll_id.clone(),
                 scrollable::AbsoluteOffset {
                     x: None,
@@ -317,7 +253,7 @@ impl Launcher {
             if !force && !did_scroll {
                 Task::none()
             } else {
-                widget::operation::scroll_to(
+                operation::scroll_to(
                     self.results_scroll_id.clone(),
                     scrollable::AbsoluteOffset {
                         x: None,
@@ -358,143 +294,7 @@ impl Launcher {
             };
         }
 
-        if self.is_preferences_window(id) {
-            return match event {
-                window::Event::CloseRequested => self.close_preferences_window(),
-                _ => Task::none(),
-            };
-        }
-
         Task::none()
-    }
-
-    fn update_theme_preference(&mut self, theme: ThemePreference) -> Task<Message> {
-        self.app_preferences.appearance.theme = theme;
-        self.preferences_editor.set_theme_error(None);
-        self.persist_preferences()
-    }
-
-    fn update_radius_preference(&mut self, radius: RadiusPreference) -> Task<Message> {
-        self.app_preferences.appearance.radius = radius;
-        self.persist_preferences()
-    }
-
-    fn update_size_preference(&mut self, size: LauncherSize) -> Task<Message> {
-        self.app_preferences.layout.size = size;
-        self.persist_preferences()
-    }
-
-    fn update_placement_preference(&mut self, placement: LauncherPlacement) -> Task<Message> {
-        self.app_preferences.layout.placement = placement;
-        self.persist_preferences()
-    }
-
-    fn update_custom_radius(&mut self, radius: f32) -> Task<Message> {
-        self.app_preferences.appearance.custom_radius = radius;
-        self.persist_preferences()
-    }
-
-    fn update_custom_top_margin(&mut self, top_margin: f32) -> Task<Message> {
-        self.app_preferences.layout.custom_top_margin = top_margin;
-        self.persist_preferences()
-    }
-
-    fn update_custom_theme_color(
-        &mut self,
-        field: ThemeColorField,
-        value: String,
-    ) -> Task<Message> {
-        self.preferences_editor
-            .set_theme_value(field, value.clone());
-
-        let Some(normalized) = normalize_hex_color(&value) else {
-            self.preferences_editor.set_theme_error(Some(
-                "Custom colors must use 6 or 8 digit hexadecimal values like #151516 or #151516FF."
-                    .to_string(),
-            ));
-            return Task::none();
-        };
-
-        self.preferences_editor.set_theme_error(None);
-        match field {
-            ThemeColorField::Background => {
-                self.app_preferences.appearance.custom_theme.background = normalized;
-            }
-            ThemeColorField::Text => {
-                self.app_preferences.appearance.custom_theme.text = normalized;
-            }
-            ThemeColorField::Accent => {
-                self.app_preferences.appearance.custom_theme.accent = normalized;
-            }
-        }
-
-        self.preferences_editor
-            .sync_from_preferences(&self.app_preferences);
-        self.persist_preferences()
-    }
-
-    fn update_shortcut_binding(&mut self, action: ShortcutAction, value: String) -> Task<Message> {
-        self.preferences_editor.set_shortcut_value(action, value);
-        self.apply_shortcut_editor()
-    }
-
-    fn capture_shortcut(&mut self, action: ShortcutAction) -> Task<Message> {
-        let mut parts = Vec::new();
-        if self.modifiers.control() {
-            parts.push("Ctrl".to_string());
-        }
-        if self.modifiers.alt() {
-            parts.push("Alt".to_string());
-        }
-        if self.modifiers.shift() {
-            parts.push("Shift".to_string());
-        }
-        if self.modifiers.logo() {
-            parts.push("Super".to_string());
-        }
-
-        if parts.is_empty() {
-            self.preferences_editor.set_shortcut_error(Some(
-                "Hold the modifiers you want and press the capture button again, or type the shortcut manually."
-                    .to_string(),
-            ));
-            return Task::none();
-        }
-
-        parts.push("Enter".to_string());
-        self.preferences_editor
-            .set_shortcut_value(action, parts.join("+"));
-        self.apply_shortcut_editor()
-    }
-
-    fn apply_shortcut_editor(&mut self) -> Task<Message> {
-        match shortcut_preferences_from_editor(&self.preferences_editor) {
-            Ok(shortcuts) => {
-                self.preferences_editor.set_shortcut_error(None);
-                self.app_preferences.shortcuts = shortcuts;
-                self.persist_preferences()
-            }
-            Err(error) => {
-                self.preferences_editor.set_shortcut_error(Some(error));
-                Task::none()
-            }
-        }
-    }
-
-    fn persist_preferences(&mut self) -> Task<Message> {
-        match crate::core::preferences::save_preferences(&self.app_preferences) {
-            Ok(()) => {
-                self.preferences_editor.set_save_error(None);
-                self.preferences_editor
-                    .sync_from_preferences(&self.app_preferences);
-                self.update_layout(self.monitor_size)
-            }
-            Err(error) => {
-                self.preferences_editor
-                    .set_save_error(Some(format!("Failed to save preferences: {error}")));
-                Task::none()
-            }
-        }
     }
 
     fn matches_shortcut(

@@ -1,40 +1,41 @@
-use egui::{Color32, CornerRadius, Stroke, Style, Visuals, style::Selection};
+use crate::core::preferences::AppPreferences;
+use crate::ui::theme::resolve_appearance;
+use egui::style::{Selection, WidgetVisuals, Widgets};
+use egui::{Color32, Context, CornerRadius, Id, Stroke, Style, Ui, Visuals};
 
-// ── Color palette ──────────────────────────────────────────────────────────
+#[derive(Debug, Clone)]
+pub struct PreferenceThemeTokens {
+    pub base: Color32,
+    pub surface: Color32,
+    pub surface_raised: Color32,
+    pub border: Color32,
+    pub muted: Color32,
+    pub text_secondary: Color32,
+    pub text_primary: Color32,
+    pub accent: Color32,
+    pub accent_dim: Color32,
+    pub hover_bg: Color32,
+    pub separator: Color32,
+    pub is_dark: bool,
+}
 
-pub const BASE: Color32 = Color32::from_rgb(20, 20, 20);
-pub const SURFACE: Color32 = Color32::from_rgb(30, 30, 30);
-pub const SURFACE_RAISED: Color32 = Color32::from_rgb(39, 39, 42);
-pub const BORDER: Color32 = Color32::from_rgb(45, 45, 48);
-pub const MUTED: Color32 = Color32::from_rgb(113, 113, 122);
-pub const TEXT_SECONDARY: Color32 = Color32::from_rgb(161, 161, 170);
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(228, 228, 231);
-pub const ACCENT: Color32 = Color32::from_rgb(94, 139, 255);
-pub const ACCENT_DIM: Color32 = Color32::from_rgb(62, 95, 180);
-pub const HOVER_BG: Color32 = Color32::from_rgb(35, 35, 38);
-pub const SEPARATOR: Color32 = Color32::from_rgb(38, 38, 42);
-
-// ── Apply to context ───────────────────────────────────────────────────────
-
-pub fn apply_theme(ctx: &egui::Context) {
+pub fn apply_theme(ctx: &Context, preferences: &AppPreferences) {
+    let tokens = PreferenceThemeTokens::from_preferences(preferences);
     let mut style = Style::default();
 
     style.visuals = Visuals {
-        dark_mode: true,
-        override_text_color: Some(TEXT_PRIMARY),
-        panel_fill: BASE,
-        window_fill: SURFACE,
-        extreme_bg_color: Color32::from_rgb(14, 14, 14),
-        faint_bg_color: SURFACE,
-        hyperlink_color: ACCENT,
-
-        widgets: style_widgets(),
-
+        dark_mode: tokens.is_dark,
+        override_text_color: Some(tokens.text_primary),
+        panel_fill: tokens.base,
+        window_fill: tokens.surface,
+        extreme_bg_color: mix(tokens.base, tokens.surface, 0.35),
+        faint_bg_color: tokens.surface,
+        hyperlink_color: tokens.accent,
+        widgets: style_widgets(&tokens),
         selection: Selection {
-            bg_fill: Color32::from_rgba_premultiplied(94, 139, 255, 60),
-            stroke: Stroke::new(1.0, ACCENT),
+            bg_fill: alpha(tokens.accent, 60),
+            stroke: Stroke::new(1.0, tokens.accent),
         },
-
         window_shadow: egui::epaint::Shadow::NONE,
         popup_shadow: egui::epaint::Shadow {
             spread: 0,
@@ -43,9 +44,12 @@ pub fn apply_theme(ctx: &egui::Context) {
             color: Color32::from_black_alpha(80),
         },
         window_corner_radius: CornerRadius::same(4),
-        window_stroke: Stroke::new(1.0, BORDER),
-
-        ..Visuals::dark()
+        window_stroke: Stroke::new(1.0, tokens.border),
+        ..if tokens.is_dark {
+            Visuals::dark()
+        } else {
+            Visuals::light()
+        }
     };
 
     style.spacing.item_spacing = egui::vec2(8.0, 6.0);
@@ -53,54 +57,157 @@ pub fn apply_theme(ctx: &egui::Context) {
     style.spacing.window_margin = egui::Margin::same(0);
     style.spacing.combo_width = 120.0;
 
+    ctx.data_mut(|data| data.insert_temp(tokens_id(), tokens));
     ctx.set_style(style);
 }
 
-fn style_widgets() -> egui::style::Widgets {
-    use egui::style::{WidgetVisuals, Widgets};
+pub fn tokens(ui: &Ui) -> PreferenceThemeTokens {
+    ui.ctx()
+        .data(|data| data.get_temp(tokens_id()))
+        .unwrap_or_else(PreferenceThemeTokens::fallback)
+}
 
+pub fn tokens_from_preferences(preferences: &AppPreferences) -> PreferenceThemeTokens {
+    PreferenceThemeTokens::from_preferences(preferences)
+}
+
+impl PreferenceThemeTokens {
+    fn from_preferences(preferences: &AppPreferences) -> Self {
+        let appearance = resolve_appearance(&preferences.appearance);
+        let accent_dim = mix(
+            to_color32(appearance.selection),
+            to_color32(appearance.panel_background),
+            0.30,
+        );
+
+        Self {
+            base: to_color32(appearance.panel_background),
+            surface: mix(
+                to_color32(appearance.panel_background),
+                to_color32(appearance.panel_border),
+                0.18,
+            ),
+            surface_raised: mix(
+                to_color32(appearance.panel_background),
+                to_color32(appearance.panel_border),
+                0.30,
+            ),
+            border: to_color32(appearance.panel_border),
+            muted: to_color32(appearance.muted_text),
+            text_secondary: to_color32(appearance.secondary_text),
+            text_primary: to_color32(appearance.primary_text),
+            accent: to_color32(appearance.selection),
+            accent_dim,
+            hover_bg: mix(
+                to_color32(appearance.first_row_hover),
+                to_color32(appearance.panel_background),
+                0.15,
+            ),
+            separator: to_color32(appearance.divider),
+            is_dark: relative_luminance(to_color32(appearance.panel_background)) < 0.5,
+        }
+    }
+
+    fn fallback() -> Self {
+        Self {
+            base: Color32::from_rgb(20, 20, 20),
+            surface: Color32::from_rgb(30, 30, 30),
+            surface_raised: Color32::from_rgb(39, 39, 42),
+            border: Color32::from_rgb(45, 45, 48),
+            muted: Color32::from_rgb(113, 113, 122),
+            text_secondary: Color32::from_rgb(161, 161, 170),
+            text_primary: Color32::from_rgb(228, 228, 231),
+            accent: Color32::from_rgb(94, 139, 255),
+            accent_dim: Color32::from_rgb(62, 95, 180),
+            hover_bg: Color32::from_rgb(35, 35, 38),
+            separator: Color32::from_rgb(38, 38, 42),
+            is_dark: true,
+        }
+    }
+}
+
+fn style_widgets(tokens: &PreferenceThemeTokens) -> Widgets {
     let corner_radius = CornerRadius::same(3);
 
     Widgets {
         noninteractive: WidgetVisuals {
-            bg_fill: SURFACE,
-            weak_bg_fill: SURFACE,
-            bg_stroke: Stroke::new(1.0, BORDER),
+            bg_fill: tokens.surface,
+            weak_bg_fill: tokens.surface,
+            bg_stroke: Stroke::new(1.0, tokens.border),
             corner_radius,
-            fg_stroke: Stroke::new(1.0, TEXT_SECONDARY),
+            fg_stroke: Stroke::new(1.0, tokens.text_secondary),
             expansion: 0.0,
         },
         inactive: WidgetVisuals {
-            bg_fill: SURFACE_RAISED,
-            weak_bg_fill: SURFACE,
-            bg_stroke: Stroke::new(1.0, BORDER),
+            bg_fill: tokens.surface_raised,
+            weak_bg_fill: tokens.surface,
+            bg_stroke: Stroke::new(1.0, tokens.border),
             corner_radius,
-            fg_stroke: Stroke::new(1.0, TEXT_SECONDARY),
+            fg_stroke: Stroke::new(1.0, tokens.text_secondary),
             expansion: 0.0,
         },
         hovered: WidgetVisuals {
-            bg_fill: HOVER_BG,
-            weak_bg_fill: HOVER_BG,
-            bg_stroke: Stroke::new(1.0, ACCENT_DIM),
+            bg_fill: tokens.hover_bg,
+            weak_bg_fill: tokens.hover_bg,
+            bg_stroke: Stroke::new(1.0, tokens.accent_dim),
             corner_radius,
-            fg_stroke: Stroke::new(1.0, TEXT_PRIMARY),
+            fg_stroke: Stroke::new(1.0, tokens.text_primary),
             expansion: 1.0,
         },
         active: WidgetVisuals {
-            bg_fill: ACCENT_DIM,
-            weak_bg_fill: ACCENT_DIM,
-            bg_stroke: Stroke::new(1.0, ACCENT),
+            bg_fill: tokens.accent_dim,
+            weak_bg_fill: tokens.accent_dim,
+            bg_stroke: Stroke::new(1.0, tokens.accent),
             corner_radius,
             fg_stroke: Stroke::new(1.0, Color32::WHITE),
             expansion: 0.0,
         },
         open: WidgetVisuals {
-            bg_fill: SURFACE_RAISED,
-            weak_bg_fill: SURFACE_RAISED,
-            bg_stroke: Stroke::new(1.0, ACCENT_DIM),
+            bg_fill: tokens.surface_raised,
+            weak_bg_fill: tokens.surface_raised,
+            bg_stroke: Stroke::new(1.0, tokens.accent_dim),
             corner_radius,
-            fg_stroke: Stroke::new(1.0, TEXT_PRIMARY),
+            fg_stroke: Stroke::new(1.0, tokens.text_primary),
             expansion: 0.0,
         },
     }
+}
+
+fn to_color32(color: iced::Color) -> Color32 {
+    Color32::from_rgba_unmultiplied(
+        (color.r * 255.0).round() as u8,
+        (color.g * 255.0).round() as u8,
+        (color.b * 255.0).round() as u8,
+        (color.a * 255.0).round() as u8,
+    )
+}
+
+fn mix(left: Color32, right: Color32, amount: f32) -> Color32 {
+    let amount = amount.clamp(0.0, 1.0);
+    Color32::from_rgba_unmultiplied(
+        channel_mix(left.r(), right.r(), amount),
+        channel_mix(left.g(), right.g(), amount),
+        channel_mix(left.b(), right.b(), amount),
+        channel_mix(left.a(), right.a(), amount),
+    )
+}
+
+fn alpha(color: Color32, alpha: u8) -> Color32 {
+    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
+}
+
+fn channel_mix(left: u8, right: u8, amount: f32) -> u8 {
+    (left as f32 + (right as f32 - left as f32) * amount)
+        .round()
+        .clamp(0.0, 255.0) as u8
+}
+
+fn relative_luminance(color: Color32) -> f32 {
+    0.2126 * (color.r() as f32 / 255.0)
+        + 0.7152 * (color.g() as f32 / 255.0)
+        + 0.0722 * (color.b() as f32 / 255.0)
+}
+
+fn tokens_id() -> Id {
+    Id::new("preferences.theme.tokens")
 }

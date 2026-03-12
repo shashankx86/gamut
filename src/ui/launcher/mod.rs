@@ -1,5 +1,4 @@
 mod actions;
-mod preferences;
 mod state;
 mod subscription;
 mod update;
@@ -12,13 +11,10 @@ use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
 };
 use crate::core::ipc::{IpcCommand, start_listener};
-use crate::core::preferences::{
-    AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
-    load_preferences,
-};
+use crate::core::preferences::{AppPreferences, load_preferences};
 use iced::Size;
 use iced::keyboard::Modifiers;
-use iced::widget::{self, Id, scrollable};
+use iced::widget::{self, scrollable};
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
 use std::hash::{Hash, Hasher};
@@ -26,36 +22,12 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 
-pub(in crate::ui) use preferences::{PreferencesEditor, ShortcutAction, ThemeColorField};
 pub(in crate::ui) use state::{
     expansion_render_range, is_manual_expansion_in_progress, spacer_height_for_rows,
 };
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
-pub(in crate::ui) const THEME_OPTIONS: [ThemePreference; 4] = [
-    ThemePreference::Dark,
-    ThemePreference::Light,
-    ThemePreference::System,
-    ThemePreference::Custom,
-];
-pub(in crate::ui) const RADIUS_OPTIONS: [RadiusPreference; 4] = [
-    RadiusPreference::Small,
-    RadiusPreference::Medium,
-    RadiusPreference::Large,
-    RadiusPreference::Custom,
-];
-pub(in crate::ui) const SIZE_OPTIONS: [LauncherSize; 4] = [
-    LauncherSize::Small,
-    LauncherSize::Medium,
-    LauncherSize::Large,
-    LauncherSize::ExtraLarge,
-];
-pub(in crate::ui) const PLACEMENT_OPTIONS: [LauncherPlacement; 3] = [
-    LauncherPlacement::RaisedCenter,
-    LauncherPlacement::Center,
-    LauncherPlacement::Custom,
-];
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -107,7 +79,6 @@ pub(super) struct Launcher {
     pub(super) input_id: widget::Id,
     pub(super) results_scroll_id: widget::Id,
     pub(super) launcher_window_id: Option<window::Id>,
-    pub(super) preferences_window_id: Option<window::Id>,
     pub(super) monitor_size: Option<Size>,
     pub(super) target_output_name: Option<String>,
     pub(super) is_visible: bool,
@@ -122,15 +93,6 @@ pub(super) struct Launcher {
     pub(super) manually_expanded: bool,
     layout_preferences: LauncherPreferences,
     pub(super) app_preferences: AppPreferences,
-    pub(super) preferences_editor: PreferencesEditor,
-    pub(super) preferences_scroll_id: Id,
-    pub(super) custom_background_input_id: Id,
-    pub(super) custom_text_input_id: Id,
-    pub(super) custom_accent_input_id: Id,
-    pub(super) shortcut_launch_input_id: Id,
-    pub(super) shortcut_down_input_id: Id,
-    pub(super) shortcut_up_input_id: Id,
-    pub(super) shortcut_close_input_id: Id,
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
     ipc_handle: IpcReceiverHandle,
@@ -153,16 +115,6 @@ pub(super) enum Message {
     WindowOpened(window::Id),
     WindowClosed(window::Id),
     ResultsScrolled(scrollable::Viewport),
-    PreferencesThemeSelected(ThemePreference),
-    PreferencesRadiusSelected(RadiusPreference),
-    PreferencesSizeSelected(LauncherSize),
-    PreferencesPlacementSelected(LauncherPlacement),
-    PreferencesCustomRadiusChanged(f32),
-    PreferencesCustomTopMarginChanged(f32),
-    PreferencesThemeColorChanged(ThemeColorField, String),
-    PreferencesShortcutChanged(ShortcutAction, String),
-    PreferencesCaptureShortcut(ShortcutAction),
-    PreferencesCloseRequested,
     FatalError(String),
     MonitorSizeLoaded(Option<Size>),
     SyncHighlightedRank { revision: u64, rank: usize },
@@ -173,7 +125,6 @@ impl Launcher {
         let layout_preferences = LauncherPreferences::load_from_env();
         let app_preferences = load_preferences();
         let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
-        let preferences_editor = PreferencesEditor::from_preferences(&app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
         let (ipc_handle, startup_task) = match start_listener() {
@@ -201,7 +152,6 @@ impl Launcher {
                 input_id,
                 results_scroll_id,
                 launcher_window_id: None,
-                preferences_window_id: None,
                 monitor_size: None,
                 target_output_name: None,
                 is_visible: false,
@@ -216,15 +166,6 @@ impl Launcher {
                 manually_expanded: false,
                 layout_preferences,
                 app_preferences,
-                preferences_editor,
-                preferences_scroll_id: Id::unique(),
-                custom_background_input_id: Id::unique(),
-                custom_text_input_id: Id::unique(),
-                custom_accent_input_id: Id::unique(),
-                shortcut_launch_input_id: Id::unique(),
-                shortcut_down_input_id: Id::unique(),
-                shortcut_up_input_id: Id::unique(),
-                shortcut_close_input_id: Id::unique(),
                 modifiers: Modifiers::default(),
                 icon_resolve_in_flight: false,
                 ipc_handle,
@@ -477,8 +418,6 @@ impl Launcher {
 
     pub(super) fn reload_preferences_from_disk(&mut self) -> Task<Message> {
         self.app_preferences = load_preferences();
-        self.preferences_editor
-            .sync_from_preferences(&self.app_preferences);
         self.update_layout(self.monitor_size)
     }
 
@@ -496,18 +435,11 @@ impl Launcher {
     }
 
     pub(super) fn window_title(&self, id: window::Id) -> Option<String> {
-        if self.preferences_window_id == Some(id) {
-            Some("Gamut Preferences".to_string())
-        } else {
-            Some("Gamut".to_string())
-        }
+        let _ = id;
+        Some("Gamut".to_string())
     }
 
     pub(super) fn is_launcher_window(&self, id: window::Id) -> bool {
         self.launcher_window_id == Some(id)
-    }
-
-    pub(super) fn is_preferences_window(&self, id: window::Id) -> bool {
-        self.preferences_window_id == Some(id)
     }
 }

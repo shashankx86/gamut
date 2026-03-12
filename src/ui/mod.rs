@@ -14,8 +14,8 @@ use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 use launcher::Launcher;
 use lucide_icons::LUCIDE_FONT_BYTES;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
+use std::sync::{Arc, Mutex};
 
 use crate::core::app_command::AppCommand;
 use styles::launcher_base_style;
