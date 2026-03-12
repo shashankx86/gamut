@@ -81,6 +81,17 @@ mod tests {
     }
 
     #[test]
+    fn visible_rows_account_for_results_padding() {
+        let layout = LauncherLayout::from_monitor_size(
+            Some(Size::new(1920.0, 1080.0)),
+            &LauncherPreferences::default(),
+            &AppPreferences::default(),
+        );
+
+        assert_eq!(layout.visible_result_rows(), 5);
+    }
+
+    #[test]
     fn centered_placement_moves_launcher_lower() {
         let mut app_preferences = AppPreferences::default();
         app_preferences.layout.placement = crate::core::preferences::LauncherPlacement::Center;

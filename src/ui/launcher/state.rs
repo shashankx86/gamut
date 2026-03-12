@@ -118,8 +118,8 @@ pub(super) fn scroll_start_for_selection(
 #[cfg(test)]
 mod tests {
     use super::{
-        SurfaceResize, animate_results, expansion_render_range, is_manual_expansion_in_progress,
-        move_selection, results_target, scroll_start_for_selection, spacer_height_for_rows,
+        animate_results, expansion_render_range, is_manual_expansion_in_progress, move_selection,
+        results_target, scroll_start_for_selection, spacer_height_for_rows, SurfaceResize,
     };
     use crate::ui::layout::LauncherLayout;
 
@@ -183,5 +183,11 @@ mod tests {
         assert_eq!(scroll_start_for_selection(5, 0, 10, 5), 1);
         assert_eq!(scroll_start_for_selection(8, 5, 10, 5), 5);
         assert_eq!(scroll_start_for_selection(2, 4, 10, 5), 2);
+    }
+
+    #[test]
+    fn scroll_offset_clamps_when_viewport_fits_fewer_rows() {
+        assert_eq!(scroll_start_for_selection(6, 0, 10, 6), 1);
+        assert_eq!(scroll_start_for_selection(9, 1, 10, 6), 4);
     }
 }

@@ -1,6 +1,6 @@
 use super::launcher::{
-    Launcher, Message, PLACEMENT_OPTIONS, RADIUS_OPTIONS, SIZE_OPTIONS, ShortcutAction,
-    THEME_OPTIONS, ThemeColorField,
+    Launcher, Message, ShortcutAction, ThemeColorField, PLACEMENT_OPTIONS, RADIUS_OPTIONS,
+    SIZE_OPTIONS, THEME_OPTIONS,
 };
 use super::styles::{
     backdrop_style, bottom_strip_style, button_surface_style, divider_style, error_text_style,
@@ -8,15 +8,15 @@ use super::styles::{
     preferences_section_title_style, result_button_style, results_scroll_style, search_input_style,
     show_more_icon_style,
 };
-use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::desktop::{trim_label, DesktopApp};
 use crate::core::preferences::{
     LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
 };
 use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{
-    Id, button, column, container, image, radio, row, scrollable, slider, svg, text, text_input,
+    button, column, container, image, radio, row, scrollable, slider, svg, text, text_input, Id,
 };
-use iced::{Color, ContentFit, Element, Length, window};
+use iced::{window, Color, ContentFit, Element, Length};
 
 const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
 const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
@@ -155,6 +155,7 @@ impl Launcher {
         let list = scrollable(results)
             .id(self.results_scroll_id.clone())
             .height(Length::Fill)
+            .on_scroll(Message::ResultsScrolled)
             .direction(iced::widget::scrollable::Direction::Vertical(
                 iced::widget::scrollable::Scrollbar::new()
                     .width(10)
@@ -173,7 +174,7 @@ impl Launcher {
             .into()
     }
 
-    fn view_result_row(&self, index: usize, first_row: bool) -> Element<'_, Message> {
+    fn view_result_row(&self, index: usize, selected: bool) -> Element<'_, Message> {
         let appearance = self.resolved_appearance();
         let app = &self.apps[index];
 
@@ -206,7 +207,7 @@ impl Launcher {
             .width(Length::Fill)
             .height(Length::Fixed(self.layout.result_row_height))
             .style(move |_theme, status| {
-                result_button_style(status, first_row, &self.layout, &appearance)
+                result_button_style(status, selected, &self.layout, &appearance)
             })
             .into()
     }

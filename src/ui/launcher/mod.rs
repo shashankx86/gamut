@@ -18,7 +18,7 @@ use crate::core::preferences::{
 };
 use iced::Size;
 use iced::keyboard::Modifiers;
-use iced::widget::{self, Id};
+use iced::widget::{self, Id, scrollable};
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
 use std::hash::{Hash, Hasher};
@@ -152,6 +152,7 @@ pub(super) enum Message {
     WindowEvent(window::Id, window::Event),
     WindowOpened(window::Id),
     WindowClosed(window::Id),
+    ResultsScrolled(scrollable::Viewport),
     PreferencesThemeSelected(ThemePreference),
     PreferencesRadiusSelected(RadiusPreference),
     PreferencesSizeSelected(LauncherSize),

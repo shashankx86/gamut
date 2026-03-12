@@ -185,8 +185,12 @@ impl LauncherLayout {
         self.result_row_height + self.result_row_gap
     }
 
+    pub(in crate::ui) fn results_viewport_height(&self) -> f32 {
+        (self.results_height - (self.results_top_bottom_padding * 2.0)).max(0.0)
+    }
+
     pub(in crate::ui) fn visible_result_rows(&self) -> usize {
-        ((self.results_height / self.result_row_scroll_step()).floor() as usize).max(1)
+        ((self.results_viewport_height() / self.result_row_scroll_step()).ceil() as usize).max(1)
     }
 
     pub(in crate::ui) fn should_recreate_surface(&self, previous: &Self) -> bool {

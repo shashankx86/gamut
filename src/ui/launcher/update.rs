@@ -45,6 +45,7 @@ impl Launcher {
             Message::IpcCommand(command) => self.handle_ipc_command(command),
             Message::WindowOpened(id) => self.on_window_opened(id),
             Message::WindowClosed(id) => self.on_window_closed(id),
+            Message::ResultsScrolled(viewport) => self.on_results_scrolled(viewport),
             Message::KeyboardEvent(id, key_event) => self.handle_key_event(id, key_event),
             Message::WindowEvent(id, window_event) => self.handle_window_event(id, window_event),
             Message::MonitorSizeLoaded(size) => self.update_layout(size),
@@ -325,6 +326,23 @@ impl Launcher {
                 )
             }
         }
+    }
+
+    fn on_results_scrolled(&mut self, viewport: scrollable::Viewport) -> Task<Message> {
+        let row_step = self.layout.result_row_scroll_step();
+
+        if row_step <= 0.0 {
+            return Task::none();
+        }
+
+        let max_start = self
+            .filtered_indices()
+            .len()
+            .saturating_sub(self.layout.visible_result_rows());
+        let start = (viewport.absolute_offset().y / row_step).round().max(0.0) as usize;
+
+        self.scroll_start_rank = start.min(max_start);
+        Task::none()
     }
 
     fn handle_window_event(&mut self, id: window::Id, event: window::Event) -> Task<Message> {

@@ -142,17 +142,17 @@ pub(super) fn error_text_style(appearance: &ResolvedAppearance) -> text::Style {
 
 pub(super) fn result_button_style(
     status: button::Status,
-    first_row: bool,
+    selected: bool,
     layout: &LauncherLayout,
     appearance: &ResolvedAppearance,
 ) -> button::Style {
-    let active_bg = if first_row {
+    let active_bg = if selected {
         appearance.first_row_active
     } else {
         Color::from_rgba(0.0, 0.0, 0.0, 0.0)
     };
 
-    let hover_bg = if first_row {
+    let hover_bg = if selected {
         appearance.first_row_hover
     } else {
         appearance.row_hover
@@ -161,7 +161,7 @@ pub(super) fn result_button_style(
     let background = match status {
         button::Status::Hovered => hover_bg,
         button::Status::Pressed => {
-            if first_row {
+            if selected {
                 appearance.first_row_pressed
             } else {
                 appearance.row_pressed
@@ -175,7 +175,7 @@ pub(super) fn result_button_style(
         text_color: appearance.primary_text,
         border: Border {
             color: appearance.panel_border,
-            width: if first_row { 1.0 } else { 0.0 },
+            width: if selected { 1.0 } else { 0.0 },
             radius: layout.item_radius.into(),
         },
         ..button::Style::default()
