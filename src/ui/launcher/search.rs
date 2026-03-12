@@ -1,6 +1,6 @@
 use super::Launcher;
-use crate::core::desktop::{DesktopApp, normalize_query};
-use crate::core::search::{ApplicationSearchResponse, rank_applications};
+use crate::core::desktop::{normalize_query, DesktopApp};
+use crate::core::search::{rank_applications, ApplicationSearchResponse};
 use log::error;
 
 impl Launcher {
@@ -9,16 +9,17 @@ impl Launcher {
         self.query = query;
         self.normalized_query = normalize_query(&self.query);
         self.search_generation = self.search_generation.wrapping_add(1);
+        self.search_in_flight = !self.normalized_query.is_empty();
         self.selected_rank = 0;
         self.highlighted_rank = 0;
+        self.results_scroll_offset = 0.0;
         self.scroll_start_rank = 0;
         self.sync_results_target_with_query();
 
         if self.normalized_query.is_empty() {
             self.filtered_indices = self.all_app_indices.clone();
             self.applied_search_generation = self.search_generation;
-        } else {
-            self.filtered_indices.clear();
+            self.search_in_flight = false;
         }
 
         self.submit_search_request();
@@ -28,15 +29,16 @@ impl Launcher {
         self.selection_revision = self.selection_revision.wrapping_add(1);
         self.apps = apps;
         self.all_app_indices = (0..self.apps.len()).take(super::MAX_RESULTS).collect();
+        self.search_in_flight = !self.normalized_query.is_empty();
         self.selected_rank = 0;
         self.highlighted_rank = 0;
+        self.results_scroll_offset = 0.0;
         self.scroll_start_rank = 0;
 
         if self.normalized_query.is_empty() {
             self.filtered_indices = self.all_app_indices.clone();
             self.applied_search_generation = self.search_generation;
-        } else {
-            self.filtered_indices.clear();
+            self.search_in_flight = false;
         }
 
         if !self.app_search_engine.replace_apps(&self.apps) {
@@ -49,6 +51,7 @@ impl Launcher {
             return false;
         }
 
+        self.search_in_flight = false;
         self.filtered_indices = response.matches;
         self.applied_search_generation = response.generation;
         self.reconcile_filtered_selection();
@@ -61,6 +64,7 @@ impl Launcher {
         self.filtered_indices = self.all_app_indices.clone();
         self.search_generation = self.search_generation.wrapping_add(1);
         self.applied_search_generation = self.search_generation;
+        self.search_in_flight = false;
         self.submit_search_request();
     }
 
@@ -72,6 +76,7 @@ impl Launcher {
         if self.filtered_indices.is_empty() {
             self.selected_rank = 0;
             self.highlighted_rank = 0;
+            self.results_scroll_offset = 0.0;
             self.scroll_start_rank = 0;
             return;
         }
@@ -92,6 +97,7 @@ impl Launcher {
         }
 
         error!("application search worker unavailable; falling back to inline ranking");
+        self.search_in_flight = false;
         self.apply_search_results_sync();
     }
 
@@ -141,7 +147,8 @@ mod tests {
 
         launcher.update_query("fire".to_string());
 
-        assert!(launcher.filtered_indices().is_empty());
+        assert_eq!(launcher.filtered_indices(), &[0, 1]);
+        assert!(launcher.search_in_flight);
         assert!(launcher.selected_result_index().is_none());
 
         assert!(launcher.apply_search_results(ApplicationSearchResponse {
@@ -151,6 +158,21 @@ mod tests {
 
         assert_eq!(launcher.filtered_indices(), &[0]);
         assert_eq!(launcher.selected_result_index(), Some(0));
+    }
+
+    #[test]
+    fn query_reset_clears_scroll_offset() {
+        let mut launcher = launcher();
+        launcher.set_apps(vec![app(
+            "Firefox",
+            "/usr/bin/firefox",
+            "/usr/bin/firefox %u",
+        )]);
+        launcher.results_scroll_offset = 120.0;
+
+        launcher.update_query("fire".to_string());
+
+        assert_eq!(launcher.results_scroll_offset, 0.0);
     }
 
     #[test]
@@ -170,6 +192,7 @@ mod tests {
             generation: current_generation,
             matches: vec![0],
         }));
-        assert!(launcher.filtered_indices().is_empty());
+        assert_eq!(launcher.filtered_indices(), &[0]);
+        assert!(launcher.search_in_flight);
     }
 }

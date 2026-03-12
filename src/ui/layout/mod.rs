@@ -95,6 +95,29 @@ mod tests {
     }
 
     #[test]
+    fn row_spacing_stays_consistent_across_sizes() {
+        for size in [
+            crate::core::preferences::LauncherSize::Small,
+            crate::core::preferences::LauncherSize::Medium,
+            crate::core::preferences::LauncherSize::Large,
+        ] {
+            let mut app_preferences = AppPreferences::default();
+            app_preferences.layout.size = size;
+
+            let layout = LauncherLayout::from_monitor_size(
+                Some(Size::new(1920.0, 1080.0)),
+                &LauncherPreferences::default(),
+                &app_preferences,
+            );
+
+            assert!(layout.result_row_gap >= 1.0);
+            assert!(layout.result_row_scroll_step() > layout.result_row_height);
+            assert!(layout.result_row_button_height() < layout.result_row_height);
+            assert!(layout.result_row_inset_y >= 1.0);
+        }
+    }
+
+    #[test]
     fn centered_placement_moves_launcher_lower() {
         let mut app_preferences = AppPreferences::default();
         app_preferences.layout.placement = crate::core::preferences::LauncherPlacement::Center;

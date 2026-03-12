@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
-use iced::keyboard::{self, Key, Modifiers, key::Named};
+use iced::keyboard::{self, key::Named, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{Task, window};
+use iced::{window, Task};
 
 impl Launcher {
     pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
@@ -151,6 +151,7 @@ impl Launcher {
         force: bool,
     ) -> Task<Message> {
         if self.selected_result_index().is_none() {
+            self.results_scroll_offset = 0.0;
             self.scroll_start_rank = 0;
             self.highlighted_rank = 0;
             return if force {
@@ -166,17 +167,24 @@ impl Launcher {
             };
         }
 
-        let visible_rows = self.layout.visible_result_rows();
         let total_rows = self.filtered_indices().len();
-        let previous_start = self.scroll_start_rank;
-        let start = super::state::scroll_start_for_selection(
+        let previous_offset = self.results_scroll_offset;
+        let target_offset = super::state::scroll_offset_for_selection(
             self.selected_rank,
-            previous_start,
+            previous_offset,
+            self.layout.results_viewport_height(),
             total_rows,
-            visible_rows,
+            self.layout.result_row_height,
+            self.layout.result_row_gap,
+            self.layout.result_row_inset_y + 1.0,
         );
-        self.scroll_start_rank = start;
-        let did_scroll = start != previous_start;
+        self.results_scroll_offset = target_offset;
+        self.scroll_start_rank = super::state::scroll_start_for_offset(
+            target_offset,
+            self.layout.result_row_scroll_step(),
+            total_rows.saturating_sub(1),
+        );
+        let did_scroll = (target_offset - previous_offset).abs() > f32::EPSILON;
 
         if did_scroll && self.selected_rank != previous_rank {
             self.highlighted_rank = previous_rank;
@@ -185,7 +193,7 @@ impl Launcher {
                 self.results_scroll_id.clone(),
                 scrollable::AbsoluteOffset {
                     x: None,
-                    y: Some(start as f32 * self.layout.result_row_scroll_step()),
+                    y: Some(target_offset),
                 },
             )
             .chain(Task::done(Message::SyncHighlightedRank {
@@ -201,7 +209,7 @@ impl Launcher {
                     self.results_scroll_id.clone(),
                     scrollable::AbsoluteOffset {
                         x: None,
-                        y: Some(start as f32 * self.layout.result_row_scroll_step()),
+                        y: Some(target_offset),
                     },
                 )
             }
@@ -215,13 +223,22 @@ impl Launcher {
             return Task::none();
         }
 
-        let max_start = self
-            .filtered_indices()
-            .len()
-            .saturating_sub(self.layout.visible_result_rows());
-        let start = (viewport.absolute_offset().y / row_step).round().max(0.0) as usize;
+        let offset = super::state::clamp_scroll_offset(
+            viewport.absolute_offset().y,
+            self.filtered_indices().len(),
+            viewport.bounds().height,
+            self.layout.result_row_height,
+            self.layout.result_row_gap,
+        );
 
-        self.scroll_start_rank = start.min(max_start);
+        let start = super::state::scroll_start_for_offset(
+            offset,
+            row_step,
+            self.filtered_indices().len().saturating_sub(1),
+        );
+
+        self.results_scroll_offset = offset;
+        self.scroll_start_rank = start;
         Task::none()
     }
 
@@ -290,10 +307,52 @@ fn normalize_binding_key(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::normalize_binding_key;
+    use crate::core::app_command::AppCommand;
+    use crate::core::desktop::DesktopApp;
+    use crate::ui::launcher::Launcher;
+    use std::sync::mpsc;
+
+    fn app(index: usize) -> DesktopApp {
+        DesktopApp::new(
+            format!("App {index}"),
+            format!("/usr/bin/app-{index} %u"),
+            format!("/usr/bin/app-{index}"),
+            vec!["%u".to_string()],
+            None,
+            Vec::new(),
+            None,
+        )
+    }
+
+    fn launcher_with_results(total_results: usize) -> Launcher {
+        let (_tx, rx) = mpsc::channel::<AppCommand>();
+        let (mut launcher, _) = Launcher::new(rx);
+        launcher.apps = (0..total_results).map(app).collect();
+        launcher.all_app_indices = (0..launcher.apps.len()).collect();
+        launcher.filtered_indices = launcher.all_app_indices.clone();
+        launcher
+    }
 
     #[test]
     fn binding_key_normalization_ignores_spacing_and_case() {
         assert_eq!(normalize_binding_key(" Arrow-Down "), "arrowdown");
         assert_eq!(normalize_binding_key("Page_Up"), "pageup");
+    }
+
+    #[test]
+    fn scrolling_selection_uses_precise_pixel_offset() {
+        let mut launcher = launcher_with_results(20);
+        launcher.selected_rank = 5;
+
+        let _ = launcher.scroll_to_selected(0, false);
+
+        let row_step = launcher.layout.result_row_scroll_step();
+        let row_top = launcher.selected_rank as f32 * row_step;
+        let row_bottom = row_top + launcher.layout.result_row_height;
+        let viewport_top = launcher.results_scroll_offset;
+        let viewport_bottom = viewport_top + launcher.layout.results_viewport_height();
+
+        assert!(row_top >= viewport_top + launcher.layout.result_row_inset_y);
+        assert!(row_bottom <= viewport_bottom - launcher.layout.result_row_inset_y);
     }
 }

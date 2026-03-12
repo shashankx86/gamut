@@ -3,13 +3,13 @@ use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style,
 };
-use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::desktop::{trim_label, DesktopApp};
 use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{Color, ContentFit, Element, Length, window};
+use iced::{window, Color, ContentFit, Element, Length};
 use iced_shadcn::{
-    ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
-    Theme as ShadcnTheme, icon_button,
+    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme,
 };
 use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
@@ -94,7 +94,7 @@ impl Launcher {
             .width(Length::Fill);
         let filtered = self.filtered_indices();
 
-        if filtered.is_empty() {
+        if filtered.is_empty() && !self.search_in_flight {
             results = results.push(
                 container(
                     text("No applications found")
@@ -106,9 +106,8 @@ impl Launcher {
                 .center_x(Length::Fill)
                 .center_y(Length::Fill),
             );
-        } else {
+        } else if !filtered.is_empty() {
             let render_range = self.result_render_range();
-            let row_step = self.layout.result_row_scroll_step();
             let visible_start = render_range.start;
             let visible_end = render_range.end;
 
@@ -133,7 +132,11 @@ impl Launcher {
             let trailing_rows = filtered.len().saturating_sub(visible_end);
             if trailing_rows > 0 {
                 results = results.push(container("").width(Length::Fill).height(Length::Fixed(
-                    super::launcher::spacer_height_for_rows(trailing_rows, row_step),
+                    super::launcher::spacer_height_for_rows(
+                        trailing_rows,
+                        self.layout.result_row_height,
+                        self.layout.result_row_gap,
+                    ),
                 )));
             }
         }
@@ -187,15 +190,20 @@ impl Launcher {
         .width(Length::Fill)
         .height(Length::Fill);
 
-        button(left)
-            .on_press(Message::LaunchIndex(index))
-            .padding([0, 10])
-            .width(Length::Fill)
-            .height(Length::Fixed(self.layout.result_row_height))
-            .style(move |_theme, status| {
-                result_button_style(status, selected, &self.layout, &appearance)
-            })
-            .into()
+        container(
+            button(left)
+                .on_press(Message::LaunchIndex(index))
+                .padding([0, 10])
+                .width(Length::Fill)
+                .height(Length::Fixed(self.layout.result_row_button_height()))
+                .style(move |_theme, status| {
+                    result_button_style(status, selected, &self.layout, &appearance)
+                }),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(self.layout.result_row_height))
+        .padding([self.layout.result_row_inset_y as u16, 0])
+        .into()
     }
 
     fn view_bottom_strip(&self) -> Element<'_, Message> {
@@ -296,17 +304,20 @@ impl Launcher {
             return 0..0;
         }
 
-        super::launcher::expansion_render_range(
-            self.scroll_start_rank,
+        super::launcher::render_range_for_viewport(
+            self.results_scroll_offset,
+            self.layout.results_viewport_height(),
             filtered.len(),
-            self.layout.visible_result_rows(),
+            self.layout.result_row_height,
+            self.layout.result_row_gap,
         )
     }
 
     fn results_top_spacer_height(&self) -> f32 {
         super::launcher::spacer_height_for_rows(
             self.result_render_range().start,
-            self.layout.result_row_scroll_step(),
+            self.layout.result_row_height,
+            self.layout.result_row_gap,
         )
     }
 }
@@ -390,6 +401,7 @@ mod tests {
         launcher.apps = (0..total_results).map(app).collect();
         launcher.all_app_indices = (0..launcher.apps.len()).collect();
         launcher.filtered_indices = launcher.all_app_indices.clone();
+        launcher.results_scroll_offset = 0.0;
         launcher
     }
 
@@ -397,14 +409,25 @@ mod tests {
     fn query_driven_expansion_only_renders_visible_rows_plus_buffer() {
         let launcher = launcher_with_results(20);
 
-        assert_eq!(launcher.result_render_range(), 0..6);
+        assert_eq!(launcher.result_render_range(), 0..7);
     }
 
     #[test]
     fn render_range_tracks_scrolled_window_for_large_result_sets() {
         let mut launcher = launcher_with_results(20);
-        launcher.scroll_start_rank = 4;
+        launcher.results_scroll_offset = 4.0 * launcher.layout.result_row_scroll_step();
 
-        assert_eq!(launcher.result_render_range(), 4..10);
+        assert_eq!(launcher.result_render_range(), 3..11);
+    }
+
+    #[test]
+    fn top_spacer_matches_hidden_rows_without_extra_gap() {
+        let mut launcher = launcher_with_results(20);
+        launcher.results_scroll_offset = 2.1 * launcher.layout.result_row_scroll_step();
+
+        assert_eq!(
+            launcher.results_top_spacer_height(),
+            launcher.layout.result_row_height
+        );
     }
 }

@@ -14,6 +14,7 @@ const DEFAULT_RESULTS_HEIGHT: f32 = 300.0;
 const DEFAULT_RESULTS_ANIMATION_SPEED: f32 = 0.25;
 const DEFAULT_RESULT_ROW_HEIGHT: f32 = 54.0;
 const DEFAULT_RESULT_ROW_GAP: f32 = 4.0;
+const DEFAULT_RESULT_ROW_INSET_Y: f32 = 2.0;
 const DEFAULT_SEARCH_ICON_SIZE: f32 = 20.0;
 const DEFAULT_RESULT_ICON_SIZE: f32 = 34.0;
 const DEFAULT_RESULT_ICON_BOX_SIZE: f32 = 40.0;
@@ -64,6 +65,7 @@ pub(in crate::ui) struct LauncherLayout {
     pub(in crate::ui) results_side_padding: f32,
     pub(in crate::ui) result_row_height: f32,
     pub(in crate::ui) result_row_gap: f32,
+    pub(in crate::ui) result_row_inset_y: f32,
     pub(in crate::ui) result_primary_text_size: f32,
     pub(in crate::ui) result_secondary_text_size: f32,
     pub(in crate::ui) empty_state_text_size: f32,
@@ -115,6 +117,7 @@ impl LauncherLayout {
             results_side_padding: scaled(DEFAULT_RESULTS_SIDE_PADDING, scale),
             result_row_height: scaled(DEFAULT_RESULT_ROW_HEIGHT, scale),
             result_row_gap: scaled(DEFAULT_RESULT_ROW_GAP, scale),
+            result_row_inset_y: scaled(DEFAULT_RESULT_ROW_INSET_Y, scale).max(1.0),
             result_primary_text_size: scaled(DEFAULT_RESULT_PRIMARY_TEXT_SIZE, scale),
             result_secondary_text_size: scaled(DEFAULT_RESULT_SECONDARY_TEXT_SIZE, scale),
             empty_state_text_size: scaled(DEFAULT_EMPTY_STATE_TEXT_SIZE, scale),
@@ -185,10 +188,15 @@ impl LauncherLayout {
         self.result_row_height + self.result_row_gap
     }
 
+    pub(in crate::ui) fn result_row_button_height(&self) -> f32 {
+        (self.result_row_height - (self.result_row_inset_y * 2.0)).max(1.0)
+    }
+
     pub(in crate::ui) fn results_viewport_height(&self) -> f32 {
         (self.results_height - (self.results_top_bottom_padding * 2.0)).max(0.0)
     }
 
+    #[cfg(test)]
     pub(in crate::ui) fn visible_result_rows(&self) -> usize {
         ((self.results_viewport_height() / self.result_row_scroll_step()).ceil() as usize).max(1)
     }

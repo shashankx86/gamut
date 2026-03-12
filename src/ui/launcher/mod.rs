@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 
-pub(in crate::ui) use state::{expansion_render_range, spacer_height_for_rows};
+pub(in crate::ui) use state::{render_range_for_viewport, spacer_height_for_rows};
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
@@ -113,6 +113,8 @@ pub(super) struct Launcher {
     selection_revision: u64,
     search_generation: u64,
     applied_search_generation: u64,
+    pub(super) search_in_flight: bool,
+    pub(super) results_scroll_offset: f32,
     pub(super) scroll_start_rank: usize,
     pub(super) filtered_indices: Vec<usize>,
     pub(super) results_progress: f32,
@@ -194,6 +196,8 @@ impl Launcher {
             selection_revision: 0,
             search_generation: 0,
             applied_search_generation: 0,
+            search_in_flight: false,
+            results_scroll_offset: 0.0,
             scroll_start_rank: 0,
             filtered_indices: Vec::new(),
             results_progress: 0.0,
@@ -226,6 +230,7 @@ impl Launcher {
         self.ignore_unfocus_until = None;
         self.selected_rank = 0;
         self.highlighted_rank = 0;
+        self.results_scroll_offset = 0.0;
         self.scroll_start_rank = 0;
         self.results_progress = 0.0;
         self.results_target = 0.0;

@@ -141,17 +141,20 @@ pub(super) fn results_scroll_style(
     };
 
     let vertical_rail = scrollable::Rail {
-        background: Some(Background::Color(appearance.scrollbar_track)),
+        background: Some(Background::Color(Color {
+            a: appearance.scrollbar_track.a * 0.72,
+            ..appearance.scrollbar_track
+        })),
         border: Border {
             color: appearance.scrollbar_track_border,
-            width: 1.0,
+            width: 0.0,
             radius: 10.0.into(),
         },
         scroller: scrollable::Scroller {
             background: Background::Color(scroller_background),
             border: Border {
                 color: scroller_border,
-                width: 1.0,
+                width: 0.5,
                 radius: 10.0.into(),
             },
         },
