@@ -72,10 +72,6 @@ pub(super) fn search_input_style(
     }
 }
 
-pub(super) fn show_more_icon_style() -> container::Style {
-    container::Style::default()
-}
-
 pub(super) fn preferences_root_style(appearance: &ResolvedAppearance) -> container::Style {
     container::Style {
         text_color: Some(appearance.primary_text),

@@ -6,7 +6,6 @@ use super::styles::{
     backdrop_style, bottom_strip_style, button_surface_style, divider_style, error_text_style,
     helper_text_style, panel_style, preferences_card_style, preferences_root_style,
     preferences_section_title_style, result_button_style, results_scroll_style, search_input_style,
-    show_more_icon_style,
 };
 use crate::core::desktop::{trim_label, DesktopApp};
 use crate::core::preferences::{
@@ -17,10 +16,14 @@ use iced::widget::{
     button, column, container, image, radio, row, scrollable, slider, svg, text, text_input, Id,
 };
 use iced::{window, Color, ContentFit, Element, Length};
+use iced_shadcn::{
+    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme,
+};
+use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
-const SEARCH_ICON_SVG: &[u8] = br##"<svg width="18" height="18" viewBox="-1.5 -1.5 21 21" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 18L13.65 13.65M16 8C16 12.4183 12.4183 16 8 16C3.58172 16 0 12.4183 0 8C0 3.58172 3.58172 0 8 0C12.4183 0 16 3.58172 16 8Z" stroke="#727272" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
-const SHOW_MORE_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M8.1 9.7L11 12.6L13.9 9.7" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
-const ENTER_ICON_SVG: &[u8] = br##"<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="18" height="18" rx="4" stroke="#727272" stroke-width="1.4"/><path d="M14 8V11.5C14 12.0523 13.5523 12.5 13 12.5H8" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 10L8 12.5L10.5 15" stroke="#83878F" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>"##;
+const BOTTOM_STRIP_ICON_BUTTON_SIZE: f32 = 20.0;
+const BOTTOM_STRIP_ICON_SIZE: f32 = 12.0;
 
 impl Launcher {
     pub(super) fn view(&self, window: window::Id) -> Element<'_, Message> {
@@ -87,18 +90,13 @@ impl Launcher {
             .style(move |_theme, status| search_input_style(&appearance, status))
             .width(Length::Fill);
 
-        row![
-            svg(SvgHandle::from_memory(SEARCH_ICON_SVG))
-                .width(Length::Fixed(self.layout.search_icon_size))
-                .height(Length::Fixed(self.layout.search_icon_size)),
-            input,
-        ]
-        .width(Length::Fill)
-        .height(Length::Fixed(self.layout.search_row_height))
-        .padding([0, self.layout.search_row_padding_x as u16])
-        .spacing(self.layout.search_row_gap)
-        .align_y(iced::alignment::Vertical::Center)
-        .into()
+        row![icon_search().size(self.layout.search_icon_size), input,]
+            .width(Length::Fill)
+            .height(Length::Fixed(self.layout.search_row_height))
+            .padding([0, self.layout.search_row_padding_x as u16])
+            .spacing(self.layout.search_row_gap)
+            .align_y(iced::alignment::Vertical::Center)
+            .into()
     }
 
     fn view_results_section(&self, progress: f32) -> Element<'_, Message> {
@@ -214,10 +212,23 @@ impl Launcher {
 
     fn view_bottom_strip(&self) -> Element<'_, Message> {
         let appearance = self.resolved_appearance();
-        let (label_text, icon_svg) = if self.query.is_empty() && self.results_target == 0.0 {
-            ("Show more", SHOW_MORE_ICON_SVG)
+        let shadcn_theme = bottom_strip_shadcn_theme(&appearance);
+        let (label_text, icon_button) = if self.query.is_empty() && self.results_target == 0.0 {
+            (
+                "Show more",
+                action_icon_button(
+                    icon_chevron_down().size(BOTTOM_STRIP_ICON_SIZE),
+                    &shadcn_theme,
+                ),
+            )
         } else {
-            ("Open", ENTER_ICON_SVG)
+            (
+                "Open",
+                action_icon_button(
+                    icon_corner_down_left().size(BOTTOM_STRIP_ICON_SIZE),
+                    &shadcn_theme,
+                ),
+            )
         };
 
         let logo = container(
@@ -235,16 +246,7 @@ impl Launcher {
                 text(label_text)
                     .size(self.layout.result_primary_text_size)
                     .color(appearance.muted_text),
-                container(
-                    svg(SvgHandle::from_memory(icon_svg))
-                        .width(Length::Fixed(self.layout.action_icon_size))
-                        .height(Length::Fixed(self.layout.action_icon_size))
-                )
-                .width(Length::Fixed(self.layout.action_icon_size))
-                .height(Length::Fixed(self.layout.action_icon_size))
-                .center_x(Length::Shrink)
-                .center_y(Length::Shrink)
-                .style(|_| show_more_icon_style()),
+                icon_button,
             ]
             .align_y(iced::alignment::Vertical::Center)
             .spacing(self.layout.bottom_strip_label_gap),
@@ -661,6 +663,60 @@ impl Launcher {
         )
         .into()
     }
+}
+
+fn bottom_strip_shadcn_theme(appearance: &super::theme::ResolvedAppearance) -> ShadcnTheme {
+    ShadcnTheme::with_palette(ShadcnPalette {
+        background: appearance.panel_background,
+        foreground: appearance.muted_text,
+        card: appearance.panel_background,
+        card_foreground: appearance.primary_text,
+        popover: appearance.panel_background,
+        popover_foreground: appearance.primary_text,
+        border: appearance.panel_border,
+        input: appearance.panel_border,
+        ring: appearance.selection,
+        primary: appearance.primary_text,
+        primary_foreground: appearance.panel_background,
+        secondary: appearance.first_row_active,
+        secondary_foreground: appearance.primary_text,
+        accent: appearance.first_row_hover,
+        accent_foreground: appearance.primary_text,
+        muted: appearance.first_row_active,
+        muted_foreground: appearance.muted_text,
+        destructive: appearance.scrollbar_scroller_dragged_border,
+        destructive_foreground: appearance.panel_background,
+        chart_1: appearance.selection,
+        chart_2: appearance.first_row_hover,
+        chart_3: appearance.first_row_pressed,
+        chart_4: appearance.row_hover,
+        chart_5: appearance.row_pressed,
+        sidebar: appearance.panel_background,
+        sidebar_foreground: appearance.primary_text,
+        sidebar_primary: appearance.primary_text,
+        sidebar_primary_foreground: appearance.panel_background,
+        sidebar_accent: appearance.first_row_hover,
+        sidebar_accent_foreground: appearance.primary_text,
+        sidebar_border: appearance.panel_border,
+        sidebar_ring: appearance.selection,
+    })
+}
+
+fn action_icon_button<'a>(
+    icon: impl Into<Element<'a, Message>>,
+    theme: &ShadcnTheme,
+) -> iced::widget::button::Button<'a, Message> {
+    icon_button(
+        icon,
+        Some(Message::LaunchFirstMatch),
+        ButtonProps::new()
+            .variant(ButtonVariant::Outline)
+            .radius(ButtonRadius::Small)
+            .size(ButtonSize::Size1),
+        theme,
+    )
+    .width(Length::Fixed(BOTTOM_STRIP_ICON_BUTTON_SIZE))
+    .height(Length::Fixed(BOTTOM_STRIP_ICON_BUTTON_SIZE))
 }
 
 fn theme_label(value: ThemePreference) -> &'static str {

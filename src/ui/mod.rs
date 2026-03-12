@@ -12,6 +12,7 @@ use iced::window;
 use iced_layershell::daemon;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 use launcher::Launcher;
+use lucide_icons::LUCIDE_FONT_BYTES;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
@@ -45,6 +46,7 @@ pub fn run_daemon(command_rx: Receiver<AppCommand>) -> Result<(), DynError> {
     .theme(launcher_theme)
     .style(launcher_base_style)
     .settings(Settings {
+        fonts: vec![LUCIDE_FONT_BYTES.into()],
         layer_settings: daemon_layer_settings(),
         ..Settings::default()
     })
