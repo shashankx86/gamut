@@ -1,4 +1,4 @@
-use super::receiver::{app_command_stream, ipc_command_stream};
+use super::receiver::{app_command_stream, ipc_command_stream, search_results_stream};
 use super::{Launcher, Message};
 use iced::{Event, Subscription, event, time, window};
 use std::time::Duration;
@@ -20,6 +20,7 @@ impl Launcher {
             window::close_events().map(Message::WindowClosed),
             Subscription::run_with(self.app_command_handle(), app_command_stream),
             Subscription::run_with(self.ipc_handle(), ipc_command_stream),
+            Subscription::run_with(self.search_results_handle(), search_results_stream),
         ];
 
         if self.needs_fast_tick() {

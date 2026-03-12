@@ -6,4 +6,6 @@ pub(crate) mod ipc;
 pub(crate) mod logging;
 pub(crate) mod preferences;
 pub(crate) mod runtime;
+pub(crate) mod search;
+pub(crate) mod storage;
 pub(crate) mod tray;

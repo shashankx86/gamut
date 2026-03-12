@@ -1,4 +1,4 @@
-use super::{AppCommandReceiverHandle, IpcReceiverHandle, Message};
+use super::{AppCommandReceiverHandle, IpcReceiverHandle, Message, SearchResultsReceiverHandle};
 use iced::futures::{SinkExt, StreamExt, channel::mpsc, stream::BoxStream};
 use iced::stream;
 
@@ -8,6 +8,12 @@ pub(super) fn ipc_command_stream(handle: &IpcReceiverHandle) -> BoxStream<'stati
 
 pub(super) fn app_command_stream(handle: &AppCommandReceiverHandle) -> BoxStream<'static, Message> {
     receiver_stream(handle.receiver.clone(), Message::AppCommand)
+}
+
+pub(super) fn search_results_stream(
+    handle: &SearchResultsReceiverHandle,
+) -> BoxStream<'static, Message> {
+    receiver_stream(handle.receiver.clone(), Message::SearchResultsLoaded)
 }
 
 fn receiver_stream<T, F>(
@@ -53,6 +59,7 @@ mod tests {
     use super::Message;
     use crate::core::app_command::AppCommand;
     use crate::core::ipc::IpcCommand;
+    use crate::core::search::ApplicationSearchResponse;
 
     #[test]
     fn message_mappers_preserve_payloads() {
@@ -67,6 +74,16 @@ mod tests {
         match Message::AppCommand(app.clone()) {
             Message::AppCommand(value) => assert_eq!(value, app),
             _ => panic!("expected app command message"),
+        }
+
+        let response = ApplicationSearchResponse {
+            generation: 3,
+            matches: vec![1, 2, 4],
+        };
+
+        match Message::SearchResultsLoaded(response.clone()) {
+            Message::SearchResultsLoaded(value) => assert_eq!(value, response),
+            _ => panic!("expected search results message"),
         }
     }
 }

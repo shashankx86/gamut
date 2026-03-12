@@ -13,16 +13,23 @@ impl Launcher {
                 self.set_apps(apps);
                 self.request_icon_resolution_for_visible()
             }
+            Message::SearchResultsLoaded(response) => {
+                if self.apply_search_results(response) {
+                    Task::batch(vec![
+                        self.scroll_to_selected(self.selected_rank, true),
+                        self.request_icon_resolution_for_visible(),
+                    ])
+                } else {
+                    Task::none()
+                }
+            }
             Message::IconsResolved(updates) => {
                 self.apply_resolved_icons(updates);
                 self.request_icon_resolution_for_visible()
             }
             Message::QueryChanged(query) => {
                 self.update_query(query);
-                Task::batch(vec![
-                    self.scroll_to_selected(self.selected_rank, true),
-                    self.request_icon_resolution_for_visible(),
-                ])
+                self.scroll_to_selected(self.selected_rank, true)
             }
             Message::LaunchFirstMatch => {
                 if let Some(index) = self.selected_result_index() {

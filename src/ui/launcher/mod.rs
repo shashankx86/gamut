@@ -1,6 +1,7 @@
 mod actions;
 mod input;
 mod receiver;
+mod search;
 mod state;
 mod subscription;
 mod update;
@@ -10,10 +11,11 @@ use super::layout::{LauncherLayout, LauncherPreferences};
 use super::theme::{ResolvedAppearance, resolve_appearance, resolve_theme};
 use crate::core::app_command::AppCommand;
 use crate::core::desktop::{
-    DesktopApp, IconResolveRequest, load_apps, normalize_query, resolve_icon_requests,
+    DesktopApp, IconResolveRequest, load_cached_apps, refresh_app_cache, resolve_icon_requests,
 };
 use crate::core::ipc::{IpcCommand, start_listener};
 use crate::core::preferences::{AppPreferences, load_preferences};
+use crate::core::search::{ApplicationSearchEngine, ApplicationSearchResponse};
 use iced::Size;
 use iced::keyboard::Modifiers;
 use iced::widget::{self, scrollable};
@@ -30,6 +32,7 @@ pub(in crate::ui) use state::{
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
+const APP_SEARCH_SUBSCRIPTION_ID: u64 = IPC_SUBSCRIPTION_ID + 2;
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -49,6 +52,27 @@ impl AppCommandReceiverHandle {
             id: IPC_SUBSCRIPTION_ID + 1,
             receiver: Arc::new(Mutex::new(receiver)),
         }
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct SearchResultsReceiverHandle {
+    id: u64,
+    receiver: Arc<Mutex<Receiver<ApplicationSearchResponse>>>,
+}
+
+impl SearchResultsReceiverHandle {
+    fn new(receiver: Receiver<ApplicationSearchResponse>) -> Self {
+        Self {
+            id: APP_SEARCH_SUBSCRIPTION_ID,
+            receiver: Arc::new(Mutex::new(receiver)),
+        }
+    }
+}
+
+impl Hash for SearchResultsReceiverHandle {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
     }
 }
 
@@ -75,6 +99,7 @@ impl Hash for IpcReceiverHandle {
 
 pub(super) struct Launcher {
     pub(super) apps: Vec<DesktopApp>,
+    pub(super) all_app_indices: Vec<usize>,
     pub(super) layout: LauncherLayout,
     pub(super) query: String,
     pub(super) normalized_query: String,
@@ -88,6 +113,8 @@ pub(super) struct Launcher {
     pub(super) selected_rank: usize,
     pub(super) highlighted_rank: usize,
     selection_revision: u64,
+    search_generation: u64,
+    applied_search_generation: u64,
     pub(super) scroll_start_rank: usize,
     pub(super) filtered_indices: Vec<usize>,
     pub(super) results_progress: f32,
@@ -97,6 +124,8 @@ pub(super) struct Launcher {
     pub(super) app_preferences: AppPreferences,
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
+    app_search_engine: ApplicationSearchEngine,
+    search_results_handle: SearchResultsReceiverHandle,
     ipc_handle: IpcReceiverHandle,
     app_command_handle: AppCommandReceiverHandle,
 }
@@ -106,6 +135,7 @@ pub(super) struct Launcher {
 pub(super) enum Message {
     Tick,
     AppsLoaded(Vec<DesktopApp>),
+    SearchResultsLoaded(ApplicationSearchResponse),
     IconsResolved(Vec<(usize, Option<PathBuf>)>),
     QueryChanged(String),
     LaunchFirstMatch,
@@ -129,10 +159,13 @@ impl Launcher {
         let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
+        let cached_apps = load_cached_apps();
+        let (app_search_engine, search_results_receiver) =
+            ApplicationSearchEngine::spawn(MAX_RESULTS);
         let (ipc_handle, startup_task) = match start_listener() {
             Ok(receiver) => (
                 IpcReceiverHandle::new(receiver),
-                Task::perform(async { load_apps() }, Message::AppsLoaded),
+                Task::perform(async { refresh_app_cache() }, Message::AppsLoaded),
             ),
             Err(error) => {
                 let (_tx, receiver) = mpsc::channel();
@@ -145,95 +178,53 @@ impl Launcher {
             }
         };
 
-        (
-            Self {
-                apps: Vec::new(),
-                layout,
-                query: String::new(),
-                normalized_query: String::new(),
-                input_id,
-                results_scroll_id,
-                launcher_window_id: None,
-                monitor_size: None,
-                target_output_name: None,
-                is_visible: false,
-                ignore_unfocus_until: None,
-                selected_rank: 0,
-                highlighted_rank: 0,
-                selection_revision: 0,
-                scroll_start_rank: 0,
-                filtered_indices: Vec::new(),
-                results_progress: 0.0,
-                results_target: 0.0,
-                manually_expanded: false,
-                layout_preferences,
-                app_preferences,
-                modifiers: Modifiers::default(),
-                icon_resolve_in_flight: false,
-                ipc_handle,
-                app_command_handle: AppCommandReceiverHandle::new(command_receiver),
-            },
-            startup_task,
-        )
+        let mut launcher = Self {
+            apps: Vec::new(),
+            all_app_indices: Vec::new(),
+            layout,
+            query: String::new(),
+            normalized_query: String::new(),
+            input_id,
+            results_scroll_id,
+            launcher_window_id: None,
+            monitor_size: None,
+            target_output_name: None,
+            is_visible: false,
+            ignore_unfocus_until: None,
+            selected_rank: 0,
+            highlighted_rank: 0,
+            selection_revision: 0,
+            search_generation: 0,
+            applied_search_generation: 0,
+            scroll_start_rank: 0,
+            filtered_indices: Vec::new(),
+            results_progress: 0.0,
+            results_target: 0.0,
+            manually_expanded: false,
+            layout_preferences,
+            app_preferences,
+            modifiers: Modifiers::default(),
+            icon_resolve_in_flight: false,
+            app_search_engine,
+            search_results_handle: SearchResultsReceiverHandle::new(search_results_receiver),
+            ipc_handle,
+            app_command_handle: AppCommandReceiverHandle::new(command_receiver),
+        };
+
+        if !cached_apps.is_empty() {
+            launcher.set_apps(cached_apps);
+        }
+
+        (launcher, startup_task)
     }
 
     pub(super) fn filtered_indices(&self) -> &[usize] {
         &self.filtered_indices
     }
 
-    fn refresh_filtered_indices(&mut self) {
-        let mut ranked_matches: Vec<(usize, i32)> = if self.normalized_query.is_empty() {
-            self.apps
-                .iter()
-                .enumerate()
-                .map(|(index, _)| (index, 0))
-                .collect()
-        } else {
-            self.apps
-                .iter()
-                .enumerate()
-                .filter_map(|(index, app)| {
-                    app.query_match_score(&self.normalized_query)
-                        .map(|score| (index, score))
-                })
-                .collect()
-        };
-
-        if !self.normalized_query.is_empty() {
-            ranked_matches.sort_by(|(left_index, left_score), (right_index, right_score)| {
-                right_score
-                    .cmp(left_score)
-                    .then_with(|| {
-                        self.apps[*left_index]
-                            .name
-                            .cmp(&self.apps[*right_index].name)
-                    })
-                    .then_with(|| left_index.cmp(right_index))
-            });
-        }
-
-        self.filtered_indices = ranked_matches
-            .into_iter()
-            .take(MAX_RESULTS)
-            .map(|(index, _)| index)
-            .collect();
-
-        if self.filtered_indices.is_empty() {
-            self.selected_rank = 0;
-        } else {
-            self.selected_rank = self.selected_rank.min(self.filtered_indices.len() - 1);
-        }
-
-        self.scroll_start_rank = self
-            .scroll_start_rank
-            .min(self.filtered_indices.len().saturating_sub(1));
-    }
-
     fn clear_window_state(&mut self) {
-        self.query.clear();
-        self.normalized_query.clear();
         self.selection_revision = self.selection_revision.wrapping_add(1);
-        self.refresh_filtered_indices();
+        self.reset_search_state();
         self.ignore_unfocus_until = None;
         self.selected_rank = 0;
         self.highlighted_rank = 0;
@@ -275,6 +266,12 @@ impl Launcher {
     }
 
     pub(super) fn selected_result_index(&self) -> Option<usize> {
+        if !self.normalized_query.is_empty()
+            && self.applied_search_generation != self.search_generation
+        {
+            return None;
+        }
+
         if self.filtered_indices.is_empty() {
             return None;
         }
@@ -290,26 +287,6 @@ impl Launcher {
     pub(super) fn move_selection(&mut self, offset: isize) {
         self.selected_rank =
             state::move_selection(self.selected_rank, self.filtered_indices.len(), offset);
-    }
-
-    pub(super) fn update_query(&mut self, query: String) {
-        self.selection_revision = self.selection_revision.wrapping_add(1);
-        self.query = query;
-        self.normalized_query = normalize_query(&self.query);
-        self.refresh_filtered_indices();
-        self.sync_results_target_with_query();
-        self.selected_rank = 0;
-        self.highlighted_rank = 0;
-        self.scroll_start_rank = 0;
-    }
-
-    pub(super) fn set_apps(&mut self, apps: Vec<DesktopApp>) {
-        self.selection_revision = self.selection_revision.wrapping_add(1);
-        self.apps = apps;
-        self.selected_rank = 0;
-        self.highlighted_rank = 0;
-        self.scroll_start_rank = 0;
-        self.refresh_filtered_indices();
     }
 
     pub(super) fn needs_fast_tick(&self) -> bool {
