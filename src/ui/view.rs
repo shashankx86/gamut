@@ -296,20 +296,11 @@ impl Launcher {
             return 0..0;
         }
 
-        if super::launcher::is_manual_expansion_in_progress(
-            self.normalized_query.is_empty(),
-            self.manually_expanded,
-            self.results_progress,
-            self.results_target,
-        ) {
-            return super::launcher::expansion_render_range(
-                self.scroll_start_rank,
-                filtered.len(),
-                self.layout.visible_result_rows(),
-            );
-        }
-
-        0..filtered.len()
+        super::launcher::expansion_render_range(
+            self.scroll_start_rank,
+            filtered.len(),
+            self.layout.visible_result_rows(),
+        )
     }
 
     fn results_top_spacer_height(&self) -> f32 {
@@ -372,4 +363,48 @@ fn action_icon_button<'a>(
     )
     .width(Length::Fixed(BOTTOM_STRIP_ICON_BUTTON_SIZE))
     .height(Length::Fixed(BOTTOM_STRIP_ICON_BUTTON_SIZE))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::app_command::AppCommand;
+    use crate::core::desktop::DesktopApp;
+    use std::sync::mpsc;
+
+    fn app(index: usize) -> DesktopApp {
+        DesktopApp::new(
+            format!("App {index}"),
+            format!("/usr/bin/app-{index} %u"),
+            format!("/usr/bin/app-{index}"),
+            vec!["%u".to_string()],
+            None,
+            Vec::new(),
+            None,
+        )
+    }
+
+    fn launcher_with_results(total_results: usize) -> Launcher {
+        let (_tx, rx) = mpsc::channel::<AppCommand>();
+        let (mut launcher, _) = Launcher::new(rx);
+        launcher.apps = (0..total_results).map(app).collect();
+        launcher.all_app_indices = (0..launcher.apps.len()).collect();
+        launcher.filtered_indices = launcher.all_app_indices.clone();
+        launcher
+    }
+
+    #[test]
+    fn query_driven_expansion_only_renders_visible_rows_plus_buffer() {
+        let launcher = launcher_with_results(20);
+
+        assert_eq!(launcher.result_render_range(), 0..6);
+    }
+
+    #[test]
+    fn render_range_tracks_scrolled_window_for_large_result_sets() {
+        let mut launcher = launcher_with_results(20);
+        launcher.scroll_start_rank = 4;
+
+        assert_eq!(launcher.result_render_range(), 4..10);
+    }
 }

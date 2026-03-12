@@ -53,7 +53,8 @@ pub(super) fn animate_results(
     }
 }
 
-pub(in crate::ui) fn is_manual_expansion_in_progress(
+#[cfg(test)]
+fn is_manual_expansion_in_progress(
     query_is_empty: bool,
     manually_expanded: bool,
     progress: f32,
