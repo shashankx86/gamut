@@ -5,10 +5,10 @@ mod tabs;
 mod theme;
 mod widgets;
 
-use crate::core::ipc::{IpcCommand, send_command};
-use crate::core::preferences::{AppPreferences, load_preferences, save_preferences};
+use crate::core::ipc::{send_command, IpcCommand};
+use crate::core::preferences::{load_preferences, save_preferences, AppPreferences};
 use general::GeneralActions;
-use model::{ThemeColorField, ThemeEditorState, update_theme_scheme_color};
+use model::{update_theme_scheme_color, ThemeColorField, ThemeEditorState};
 use shortcuts::ShortcutEditor;
 use tabs::PreferencesTab;
 
@@ -46,6 +46,13 @@ impl PreferencesApp {
         let _ = send_command(IpcCommand::ReloadPreferences);
     }
 
+    fn reset_to_defaults(&mut self) {
+        self.preferences = AppPreferences::default();
+        self.theme_editor = ThemeEditorState::from_preferences(&self.preferences);
+        self.shortcut_editor = ShortcutEditor::from_shortcuts(&self.preferences.shortcuts);
+        self.persist();
+    }
+
     fn update_theme_color(
         &mut self,
         scheme: crate::core::preferences::ThemeSchemeId,
@@ -74,6 +81,7 @@ impl eframe::App for PreferencesApp {
         let tokens = theme::tokens_from_preferences(&self.preferences);
 
         // Sidebar
+        let mut reset_requested = false;
         egui::SidePanel::left("preferences_sidebar")
             .resizable(false)
             .exact_width(140.0)
@@ -83,8 +91,14 @@ impl eframe::App for PreferencesApp {
                     .inner_margin(egui::Margin::symmetric(8, 0)),
             )
             .show(ctx, |ui| {
-                tabs::render_sidebar(ui, &mut self.active_tab);
+                if tabs::render_sidebar(ui, &mut self.active_tab) {
+                    reset_requested = true;
+                }
             });
+
+        if reset_requested {
+            self.reset_to_defaults();
+        }
 
         // Main content
         egui::CentralPanel::default()
@@ -124,11 +138,10 @@ impl eframe::App for PreferencesApp {
                                 }
 
                                 if let Some(error) = self.theme_editor.theme_error() {
+                                    let tokens = theme::tokens(ui);
                                     ui.add_space(10.0);
                                     ui.label(
-                                        egui::RichText::new(error)
-                                            .size(11.0)
-                                            .color(egui::Color32::from_rgb(255, 120, 100)),
+                                        egui::RichText::new(error).size(11.0).color(tokens.accent),
                                     );
                                 }
                             }

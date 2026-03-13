@@ -1,3 +1,4 @@
+mod color_scheme;
 mod palette;
 mod resolver;
 

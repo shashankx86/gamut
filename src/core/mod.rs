@@ -9,4 +9,5 @@ pub(crate) mod preferences;
 pub(crate) mod runtime;
 pub(crate) mod search;
 pub(crate) mod storage;
+pub(crate) mod theme;
 pub(crate) mod tray;

@@ -1,5 +1,5 @@
-use iced::Color;
 use iced::theme::Palette;
+use iced::Color;
 
 #[derive(Debug, Clone, Copy)]
 pub(in crate::ui) struct ThemePalette {
@@ -7,16 +7,26 @@ pub(in crate::ui) struct ThemePalette {
     pub appearance: ResolvedAppearance,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::ui) enum ThemeScheme {
+    Light,
+    Dark,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(in crate::ui) struct ResolvedAppearance {
     pub panel_background: Color,
+    pub panel_surface: Color,
+    pub panel_surface_raised: Color,
     pub panel_border: Color,
     pub primary_text: Color,
     pub secondary_text: Color,
     pub muted_text: Color,
     pub divider: Color,
     pub search_icon: Color,
-    pub selection: Color,
+    pub accent: Color,
+    pub accent_soft: Color,
+    pub accent_strong: Color,
     pub first_row_active: Color,
     pub first_row_hover: Color,
     pub first_row_pressed: Color,

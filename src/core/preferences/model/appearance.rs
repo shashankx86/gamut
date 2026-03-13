@@ -1,3 +1,5 @@
+use crate::core::theme::default_theme_colors;
+use dark_light::Mode as SystemThemeMode;
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,21 @@ impl AppearancePreferences {
 
     pub fn scheme_mut(&mut self, scheme: ThemeSchemeId) -> &mut ThemeColors {
         self.schemes.scheme_mut(scheme)
+    }
+
+    pub fn resolved_scheme(&self) -> ThemeSchemeId {
+        self.resolved_scheme_for_mode(dark_light::detect().unwrap_or(SystemThemeMode::Unspecified))
+    }
+
+    pub fn resolved_scheme_for_mode(&self, system_mode: SystemThemeMode) -> ThemeSchemeId {
+        match self.theme {
+            ThemePreference::Light => ThemeSchemeId::Light,
+            ThemePreference::Dark => ThemeSchemeId::Dark,
+            ThemePreference::System => match system_mode {
+                SystemThemeMode::Light => ThemeSchemeId::Light,
+                _ => ThemeSchemeId::Dark,
+            },
+        }
     }
 }
 
@@ -64,6 +81,20 @@ impl<'de> Deserialize<'de> for AppearancePreferences {
 
         if let Some(custom_theme) = wire.custom_theme {
             schemes.dark = custom_theme;
+        }
+
+        // Migrate prior bundled light defaults to the current neutral light
+        // palette so existing installs do not keep stale tinted colors.
+        let old_light = ThemeColors::new("#F8F9FB", "#34446D", "#416EF5");
+        let previous_light = ThemeColors::new("#F8F9FB", "#1C1D21", "#416EF5");
+        let current_light = ThemeColors::new("#F3F4F6", "#181A1F", "#416EF5");
+        let grayscale_light = ThemeColors::new("#F4F4F4", "#1A1A1A", "#416EF5");
+        if schemes.light == old_light
+            || schemes.light == previous_light
+            || schemes.light == current_light
+            || schemes.light == grayscale_light
+        {
+            schemes.light = default_light_theme_colors();
         }
 
         Ok(Self {
@@ -200,11 +231,11 @@ impl Default for ThemeSchemes {
 }
 
 pub fn default_light_theme_colors() -> ThemeColors {
-    ThemeColors::new("#F8F9FB", "#1C222A", "#416EF5")
+    default_theme_colors(ThemeSchemeId::Light)
 }
 
 pub fn default_dark_theme_colors() -> ThemeColors {
-    ThemeColors::new("#151516", "#EBEDF2", "#5E8BFF")
+    default_theme_colors(ThemeSchemeId::Dark)
 }
 
 pub fn normalize_hex_color(value: &str) -> Option<String> {
@@ -223,7 +254,7 @@ use super::RadiusPreference;
 #[cfg(test)]
 mod tests {
     use super::{
-        AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
+        normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
     };
 
     #[test]
@@ -256,6 +287,33 @@ accent = "#5588FF"
         assert_eq!(
             appearance.scheme(ThemeSchemeId::Dark),
             &ThemeColors::new("#112233", "#EEF0F3", "#5588FF"),
+        );
+    }
+
+    #[test]
+    fn previous_light_defaults_migrate_to_current_light_palette() {
+        let appearance: AppearancePreferences = toml::from_str(
+            r##"
+theme = "light"
+radius = "small"
+custom_radius = 10.0
+
+[schemes.light]
+background = "#F8F9FB"
+text = "#1C1D21"
+accent = "#416EF5"
+
+[schemes.dark]
+background = "#151516"
+text = "#EBEDF2"
+accent = "#5E8BFF"
+"##,
+        )
+        .expect("previous light defaults should deserialize");
+
+        assert_eq!(
+            appearance.scheme(ThemeSchemeId::Light),
+            &ThemeColors::new("#F3F4F6", "#1F2328", "#416EF5"),
         );
     }
 }

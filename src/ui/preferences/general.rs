@@ -53,7 +53,6 @@ pub fn render_general(
             ui.set_width(ui.available_width());
             ui.label(RichText::new(scheme.label()).strong().size(12.0));
             ui.add_space(6.0);
-
             for field in ThemeColorField::ALL {
                 setting_row(ui, field.label(), |ui| {
                     let mut value = theme_editor.theme_value(scheme, field).to_string();

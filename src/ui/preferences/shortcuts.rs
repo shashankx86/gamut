@@ -1,9 +1,9 @@
-use egui::{Button, Color32, CornerRadius, Key, Modifiers, RichText, Stroke, StrokeKind, Ui, Vec2};
+use egui::{Button, CornerRadius, Key, Modifiers, RichText, Stroke, StrokeKind, Ui, Vec2};
 
 use crate::core::preferences::{ShortcutBinding, ShortcutPreferences};
 use std::str::FromStr;
 
-use super::model::{ShortcutAction, shortcut_preferences_from_values};
+use super::model::{shortcut_preferences_from_values, ShortcutAction};
 use super::theme;
 use super::widgets::section_heading;
 
@@ -171,10 +171,11 @@ pub fn render_shortcuts(
     // ── Error feedback ─────────────────────────────────────────────────
     if let Some(err) = &editor.error {
         ui.add_space(4.0);
+        let tokens = theme::tokens(ui);
         ui.label(
             RichText::new(format!("⚠ {err}"))
                 .size(11.0)
-                .color(Color32::from_rgb(255, 120, 100)),
+                .color(tokens.accent),
         );
     }
 
@@ -214,15 +215,15 @@ fn shortcut_edit_row(
     // Row container
     egui::Frame::new()
         .fill(if is_capturing {
-            tokens.surface
+            tokens.accent_dim
         } else {
-            tokens.base
+            tokens.surface
         })
         .corner_radius(4)
         .stroke(if is_capturing {
             Stroke::new(1.0, tokens.accent)
         } else {
-            Stroke::NONE
+            Stroke::new(1.0, tokens.border)
         })
         .inner_margin(egui::Margin::symmetric(12, 8))
         .show(ui, |ui| {

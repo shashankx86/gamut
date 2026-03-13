@@ -1,4 +1,4 @@
-use egui::{Color32, CornerRadius, RichText, Sense, Stroke, StrokeKind, Ui, Vec2, pos2};
+use egui::{pos2, Color32, CornerRadius, RichText, Sense, Stroke, StrokeKind, Ui, Vec2};
 
 use super::theme;
 
@@ -67,7 +67,7 @@ pub fn toggle_switch(ui: &mut Ui, on: &mut bool) -> bool {
             anim_t,
         );
         let thumb_center = pos2(thumb_x, rect.center().y);
-        painter.circle_filled(thumb_center, thumb_radius, Color32::from_gray(250));
+        painter.circle_filled(thumb_center, thumb_radius, tokens.text_primary);
     }
 
     changed

@@ -1,4 +1,4 @@
-use crate::core::preferences::{AppearancePreferences, ThemePreference};
+use crate::core::preferences::{AppearancePreferences, ThemeSchemeId};
 use dark_light::Mode as SystemThemeMode;
 
 const LAUNCHER_LOGO_DARK: &[u8] = include_bytes!(concat!(
@@ -35,13 +35,9 @@ pub(crate) fn asset_theme_for_mode(
     preferences: &AppearancePreferences,
     system_mode: SystemThemeMode,
 ) -> AssetTheme {
-    match preferences.theme {
-        ThemePreference::Light => AssetTheme::Light,
-        ThemePreference::Dark => AssetTheme::Dark,
-        ThemePreference::System => match system_mode {
-            SystemThemeMode::Light => AssetTheme::Light,
-            _ => AssetTheme::Dark,
-        },
+    match preferences.resolved_scheme_for_mode(system_mode) {
+        ThemeSchemeId::Light => AssetTheme::Light,
+        ThemeSchemeId::Dark => AssetTheme::Dark,
     }
 }
 
@@ -61,7 +57,7 @@ pub(crate) const fn tray_icon_svg(theme: AssetTheme) -> &'static [u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{AssetTheme, asset_theme_for_mode, launcher_logo_svg, tray_icon_svg};
+    use super::{asset_theme_for_mode, launcher_logo_svg, tray_icon_svg, AssetTheme};
     use crate::core::preferences::{AppearancePreferences, ThemePreference};
     use dark_light::Mode as SystemThemeMode;
 

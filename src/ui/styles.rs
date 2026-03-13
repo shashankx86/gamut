@@ -67,7 +67,7 @@ pub(super) fn search_input_style(
         icon: appearance.search_icon,
         placeholder,
         value: appearance.primary_text,
-        selection: appearance.selection,
+        selection: appearance.accent_soft,
     }
 }
 
@@ -105,7 +105,11 @@ pub(super) fn result_button_style(
         background: Some(Background::Color(background)),
         text_color: appearance.primary_text,
         border: Border {
-            color: appearance.panel_border,
+            color: if selected {
+                appearance.accent_soft
+            } else {
+                Color::TRANSPARENT
+            },
             width: if selected { 1.0 } else { 0.0 },
             radius: layout.item_radius.into(),
         },

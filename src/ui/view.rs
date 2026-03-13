@@ -5,13 +5,13 @@ use super::styles::{
 };
 use super::theme::resolve_asset_theme;
 use crate::core::assets::launcher_logo_svg;
-use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::desktop::{trim_label, DesktopApp};
 use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{Color, ContentFit, Element, Length, window};
+use iced::{window, ContentFit, Element, Length};
 use iced_shadcn::{
-    ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
-    Theme as ShadcnTheme, icon_button,
+    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme,
 };
 use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
@@ -101,7 +101,7 @@ impl Launcher {
                 container(
                     text("No applications found")
                         .size(self.layout.empty_state_text_size)
-                        .color(Color::from_rgb(0.62, 0.64, 0.67)),
+                        .color(appearance.muted_text),
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -334,7 +334,7 @@ fn bottom_strip_shadcn_theme(appearance: &super::theme::ResolvedAppearance) -> S
         popover_foreground: appearance.primary_text,
         border: appearance.panel_border,
         input: appearance.panel_border,
-        ring: appearance.selection,
+        ring: appearance.accent,
         primary: appearance.primary_text,
         primary_foreground: appearance.panel_background,
         secondary: appearance.first_row_active,
@@ -343,9 +343,9 @@ fn bottom_strip_shadcn_theme(appearance: &super::theme::ResolvedAppearance) -> S
         accent_foreground: appearance.primary_text,
         muted: appearance.first_row_active,
         muted_foreground: appearance.muted_text,
-        destructive: appearance.scrollbar_scroller_dragged_border,
+        destructive: appearance.accent_strong,
         destructive_foreground: appearance.panel_background,
-        chart_1: appearance.selection,
+        chart_1: appearance.accent,
         chart_2: appearance.first_row_hover,
         chart_3: appearance.first_row_pressed,
         chart_4: appearance.row_hover,
@@ -357,7 +357,7 @@ fn bottom_strip_shadcn_theme(appearance: &super::theme::ResolvedAppearance) -> S
         sidebar_accent: appearance.first_row_hover,
         sidebar_accent_foreground: appearance.primary_text,
         sidebar_border: appearance.panel_border,
-        sidebar_ring: appearance.selection,
+        sidebar_ring: appearance.accent,
     })
 }
 

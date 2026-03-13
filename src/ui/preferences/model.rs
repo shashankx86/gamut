@@ -1,6 +1,7 @@
 use crate::core::preferences::{
-    AppPreferences, ShortcutBinding, ShortcutPreferences, ThemeSchemeId, normalize_hex_color,
+    normalize_hex_color, AppPreferences, ShortcutBinding, ShortcutPreferences, ThemeSchemeId,
 };
+use crate::core::theme::LIGHT_SEED;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,9 +24,9 @@ impl ThemeColorField {
 
     pub const fn placeholder(self) -> &'static str {
         match self {
-            Self::Background => "#151516",
-            Self::Text => "#EBEDF2",
-            Self::Accent => "#5E8BFF",
+            Self::Background => LIGHT_SEED.background,
+            Self::Text => LIGHT_SEED.text,
+            Self::Accent => LIGHT_SEED.accent,
         }
     }
 }
@@ -214,8 +215,8 @@ fn same_shortcut(left: &ShortcutBinding, right: &ShortcutBinding) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        ShortcutAction, ThemeColorField, ThemeEditorState, shortcut_preferences_from_values,
-        update_theme_scheme_color,
+        shortcut_preferences_from_values, update_theme_scheme_color, ShortcutAction,
+        ThemeColorField, ThemeEditorState,
     };
     use crate::core::preferences::{AppPreferences, ThemeSchemeId};
 
