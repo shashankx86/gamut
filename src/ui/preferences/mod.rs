@@ -12,8 +12,8 @@ use model::{update_theme_scheme_color, ThemeColorField, ThemeEditorState};
 use shortcuts::ShortcutEditor;
 use tabs::PreferencesTab;
 
-const WINDOW_WIDTH: f32 = 760.0;
-const WINDOW_HEIGHT: f32 = 520.0;
+const WINDOW_WIDTH: f32 = 780.0;
+const WINDOW_HEIGHT: f32 = 560.0;
 
 struct PreferencesApp {
     preferences: AppPreferences,
@@ -24,6 +24,7 @@ struct PreferencesApp {
 
 impl PreferencesApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        register_lucide_font(&cc.egui_ctx);
         let prefs = load_preferences();
         theme::apply_theme(&cc.egui_ctx, &prefs);
         let theme_editor = ThemeEditorState::from_preferences(&prefs);
@@ -84,7 +85,7 @@ impl eframe::App for PreferencesApp {
         let mut reset_requested = false;
         egui::SidePanel::left("preferences_sidebar")
             .resizable(false)
-            .exact_width(140.0)
+            .exact_width(150.0)
             .frame(
                 egui::Frame::new()
                     .fill(tokens.base)
@@ -178,6 +179,20 @@ pub(super) fn run() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(|cc| Ok(Box::new(PreferencesApp::new(cc)))),
     )
     .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)
+}
+
+fn register_lucide_font(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "lucide".to_owned(),
+        egui::FontData::from_static(lucide_icons::LUCIDE_FONT_BYTES).into(),
+    );
+    fonts
+        .families
+        .entry(egui::FontFamily::Name("lucide".into()))
+        .or_default()
+        .push("lucide".to_owned());
+    ctx.set_fonts(fonts);
 }
 
 fn configure_linux_backend() {

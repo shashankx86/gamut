@@ -174,6 +174,14 @@ fn relative_luminance(color: Color32) -> f32 {
         + 0.0722 * (color.b() as f32 / 255.0)
 }
 
+pub fn contrast_text_for(bg: Color32) -> Color32 {
+    if relative_luminance(bg) > 0.5 {
+        Color32::from_rgb(30, 30, 30)
+    } else {
+        Color32::from_rgb(255, 255, 255)
+    }
+}
+
 fn tokens_id() -> Id {
     Id::new("preferences.theme.tokens")
 }

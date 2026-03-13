@@ -1,4 +1,5 @@
-use egui::{ComboBox, RichText, Ui};
+use egui::{RichText, Ui};
+use lucide_icons::Icon;
 
 use crate::core::preferences::{
     AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ThemePreference,
@@ -6,9 +7,12 @@ use crate::core::preferences::{
 };
 
 use super::model::{ThemeColorField, ThemeEditorState};
-use super::widgets::{section_heading, setting_row, thin_separator, toggle_switch};
+use super::theme;
+use super::widgets::{
+    color_swatch, section_card, segmented_control, setting_row, theme_card, thin_separator,
+    toggle_switch,
+};
 
-/// Returns `true` if any preference was changed (needs persist).
 pub struct GeneralActions {
     pub changed: bool,
     pub theme_updates: Vec<(ThemeSchemeId, ThemeColorField, String)>,
@@ -24,150 +28,137 @@ pub fn render_general(
         theme_updates: Vec::new(),
     };
 
-    // ── Appearance ──────────────────────────────────────────────────────
-    section_heading(ui, "Appearance");
-
-    setting_row(ui, "Theme", |ui| {
-        let current = theme_label(prefs.appearance.theme);
-        ComboBox::from_id_salt("theme_combo")
-            .selected_text(RichText::new(current).size(12.0))
-            .width(110.0)
-            .show_ui(ui, |ui| {
-                for option in ThemePreference::ALL {
-                    let label = theme_label(option);
-                    if ui
-                        .selectable_value(&mut prefs.appearance.theme, option, label)
-                        .changed()
-                    {
-                        actions.changed = true;
-                    }
+    // ── Appearance ─────────────────────────────────────────────────────
+    section_card(ui, Icon::Palette, "Appearance", |ui| {
+        // Theme choice cards
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 8.0;
+            for option in ThemePreference::ALL {
+                let icon = match option {
+                    ThemePreference::System => Icon::SunMoon,
+                    ThemePreference::Light => Icon::Sun,
+                    ThemePreference::Dark => Icon::Moon,
+                };
+                if theme_card(ui, icon, option.label(), prefs.appearance.theme == option) {
+                    prefs.appearance.theme = option;
+                    actions.changed = true;
                 }
-            });
-    });
-
-    thin_separator(ui);
-
-    section_heading(ui, "Color Schemes");
-    for scheme in ThemeSchemeId::ALL {
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.label(RichText::new(scheme.label()).strong().size(12.0));
-            ui.add_space(6.0);
-            for field in ThemeColorField::ALL {
-                setting_row(ui, field.label(), |ui| {
-                    let mut value = theme_editor.theme_value(scheme, field).to_string();
-                    let response = ui.add(
-                        egui::TextEdit::singleline(&mut value)
-                            .desired_width(120.0)
-                            .hint_text(field.placeholder()),
-                    );
-
-                    if response.changed() {
-                        actions.theme_updates.push((scheme, field, value));
-                    }
-                });
             }
         });
+
         ui.add_space(8.0);
-    }
+        thin_separator(ui);
+        ui.add_space(4.0);
 
-    setting_row(ui, "Window Radius", |ui| {
-        let current = radius_label(prefs.appearance.radius);
-        ComboBox::from_id_salt("radius_combo")
-            .selected_text(RichText::new(current).size(12.0))
-            .width(110.0)
-            .show_ui(ui, |ui| {
-                for option in [
-                    RadiusPreference::Small,
-                    RadiusPreference::Medium,
-                    RadiusPreference::Large,
-                ] {
-                    let label = radius_label(option);
-                    if ui
-                        .selectable_value(&mut prefs.appearance.radius, option, label)
-                        .changed()
-                    {
-                        actions.changed = true;
-                    }
-                }
-            });
+        // Window Radius
+        setting_row(ui, "Window Radius", |ui| {
+            let radius_options = [
+                RadiusPreference::Small,
+                RadiusPreference::Medium,
+                RadiusPreference::Large,
+            ];
+            let radius_index = radius_options
+                .iter()
+                .position(|&r| r == prefs.appearance.radius)
+                .unwrap_or(0);
+
+            if let Some(new_idx) =
+                segmented_control(ui, radius_index, &["Small", "Medium", "Large"])
+            {
+                prefs.appearance.radius = radius_options[new_idx];
+                actions.changed = true;
+            }
+        });
     });
 
-    ui.add_space(12.0);
+    // ── Color Schemes ──────────────────────────────────────────────────
+    section_card(ui, Icon::Paintbrush, "Color Schemes", |ui| {
+        for scheme in ThemeSchemeId::ALL {
+            let tokens = theme::tokens(ui);
+            ui.label(
+                RichText::new(scheme.label())
+                    .size(11.5)
+                    .color(tokens.text_primary)
+                    .strong(),
+            );
+            ui.add_space(4.0);
 
-    // ── Layout ──────────────────────────────────────────────────────────
-    section_heading(ui, "Layout");
+            for field in ThemeColorField::ALL {
+                let tokens = theme::tokens(ui);
+                ui.horizontal(|ui| {
+                    ui.set_min_height(28.0);
+                    ui.label(
+                        RichText::new(field.label())
+                            .size(12.0)
+                            .color(tokens.text_secondary),
+                    );
+                    ui.with_layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                        |ui| {
+                            let mut value =
+                                theme_editor.theme_value(scheme, field).to_string();
+                            let response = ui.add(
+                                egui::TextEdit::singleline(&mut value)
+                                    .desired_width(100.0)
+                                    .hint_text(field.placeholder()),
+                            );
+                            color_swatch(ui, theme_editor.theme_value(scheme, field));
 
-    setting_row(ui, "Window Size", |ui| {
-        let current = size_label(prefs.layout.size);
-        ComboBox::from_id_salt("size_combo")
-            .selected_text(RichText::new(current).size(12.0))
-            .width(110.0)
-            .show_ui(ui, |ui| {
-                for option in LauncherSize::ALL {
-                    let label = size_label(option);
-                    if ui
-                        .selectable_value(&mut prefs.layout.size, option, label)
-                        .changed()
-                    {
-                        actions.changed = true;
-                    }
-                }
-            });
-    });
+                            if response.changed() {
+                                actions.theme_updates.push((scheme, field, value));
+                            }
+                        },
+                    );
+                });
+            }
 
-    thin_separator(ui);
-
-    setting_row(ui, "Window Location", |ui| {
-        let current = placement_label(prefs.layout.placement);
-        ComboBox::from_id_salt("placement_combo")
-            .selected_text(RichText::new(current).size(12.0))
-            .width(110.0)
-            .show_ui(ui, |ui| {
-                for &option in &[LauncherPlacement::Center, LauncherPlacement::RaisedCenter] {
-                    let label = placement_label(option);
-                    if ui
-                        .selectable_value(&mut prefs.layout.placement, option, label)
-                        .changed()
-                    {
-                        actions.changed = true;
-                    }
-                }
-            });
-    });
-
-    ui.add_space(12.0);
-
-    // ── System ──────────────────────────────────────────────────────────
-    section_heading(ui, "System");
-
-    setting_row(ui, "Start at Login", |ui| {
-        if toggle_switch(ui, &mut prefs.system.start_at_login) {
-            actions.changed = true;
+            ui.add_space(8.0);
         }
     });
 
+    // ── Layout ─────────────────────────────────────────────────────────
+    section_card(ui, Icon::AppWindow, "Layout", |ui| {
+        setting_row(ui, "Window Size", |ui| {
+            let size_index = LauncherSize::ALL
+                .iter()
+                .position(|&s| s == prefs.layout.size)
+                .unwrap_or(1);
+
+            let labels: Vec<&str> = LauncherSize::ALL.iter().map(|s| s.label()).collect();
+            if let Some(new_idx) = segmented_control(ui, size_index, &labels) {
+                prefs.layout.size = LauncherSize::ALL[new_idx];
+                actions.changed = true;
+            }
+        });
+
+        thin_separator(ui);
+
+        setting_row(ui, "Position", |ui| {
+            let placement_options =
+                [LauncherPlacement::Center, LauncherPlacement::RaisedCenter];
+            let placement_labels = ["Center", "Elevated"];
+            let placement_index = placement_options
+                .iter()
+                .position(|&p| p == prefs.layout.placement)
+                .unwrap_or(1);
+
+            if let Some(new_idx) =
+                segmented_control(ui, placement_index, &placement_labels)
+            {
+                prefs.layout.placement = placement_options[new_idx];
+                actions.changed = true;
+            }
+        });
+    });
+
+    // ── System ─────────────────────────────────────────────────────────
+    section_card(ui, Icon::MonitorCog, "System", |ui| {
+        setting_row(ui, "Start at Login", |ui| {
+            if toggle_switch(ui, &mut prefs.system.start_at_login) {
+                actions.changed = true;
+            }
+        });
+    });
+
     actions
-}
-
-fn theme_label(theme: ThemePreference) -> &'static str {
-    theme.label()
-}
-
-fn radius_label(radius: RadiusPreference) -> &'static str {
-    match radius {
-        RadiusPreference::Custom => RadiusPreference::Medium.label(),
-        _ => radius.label(),
-    }
-}
-
-fn size_label(size: LauncherSize) -> &'static str {
-    size.label()
-}
-
-fn placement_label(placement: LauncherPlacement) -> &'static str {
-    match placement {
-        LauncherPlacement::Center => "Center",
-        LauncherPlacement::RaisedCenter | LauncherPlacement::Custom => "Elevated Center",
-    }
 }

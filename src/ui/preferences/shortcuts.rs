@@ -1,11 +1,12 @@
 use egui::{Button, CornerRadius, Key, Modifiers, RichText, Stroke, StrokeKind, Ui, Vec2};
+use lucide_icons::Icon;
 
 use crate::core::preferences::{ShortcutBinding, ShortcutPreferences};
 use std::str::FromStr;
 
 use super::model::{shortcut_preferences_from_values, ShortcutAction};
 use super::theme;
-use super::widgets::section_heading;
+use super::widgets::{lucide_icon, section_card};
 
 impl ShortcutAction {
     fn description(self) -> &'static str {
@@ -103,8 +104,6 @@ impl ShortcutEditor {
         Some(self.try_apply())
     }
 
-    /// Attempt to parse and validate all buffers into a `ShortcutPreferences`.
-    /// Returns `Ok(shortcuts)` on success or `Err(msg)` on validation failure.
     fn try_apply(&self) -> Result<ShortcutPreferences, String> {
         shortcut_preferences_from_values(&[
             (
@@ -137,7 +136,6 @@ pub fn render_shortcuts(
     editor: &mut ShortcutEditor,
 ) -> bool {
     let mut changed = false;
-    let tokens = theme::tokens(ui);
 
     if let Some(result) = editor.capture_from_input(ui.ctx()) {
         match result {
@@ -152,62 +150,67 @@ pub fn render_shortcuts(
         }
     }
 
-    section_heading(ui, "Keyboard Shortcuts");
-
-    ui.add_space(4.0);
-    ui.label(
-        RichText::new("Click reassign, then press the shortcut you want to save.")
-            .size(11.0)
-            .color(tokens.text_secondary),
-    );
-    ui.add_space(6.0);
-
-    // ── Shortcut rows ──────────────────────────────────────────────────
-    for action in ShortcutAction::ALL {
-        changed |= shortcut_edit_row(ui, action, shortcuts, editor);
-        ui.add_space(2.0);
-    }
-
-    // ── Error feedback ─────────────────────────────────────────────────
-    if let Some(err) = &editor.error {
-        ui.add_space(4.0);
+    section_card(ui, Icon::Keyboard, "Keyboard Shortcuts", |ui| {
         let tokens = theme::tokens(ui);
-        ui.label(
-            RichText::new(format!("⚠ {err}"))
-                .size(11.0)
-                .color(tokens.accent),
-        );
-    }
 
-    // ── Footer ─────────────────────────────────────────────────────────
-    ui.add_space(12.0);
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let btn = egui::Button::new(
-            RichText::new("Restore Defaults")
+        ui.label(
+            RichText::new("Click reassign, then press the shortcut you want to save.")
                 .size(11.0)
                 .color(tokens.text_secondary),
-        )
-        .fill(tokens.surface)
-        .stroke(Stroke::new(1.0, tokens.border))
-        .corner_radius(4);
+        );
+        ui.add_space(6.0);
 
-        if ui.add(btn).clicked() {
-            *shortcuts = ShortcutPreferences::default();
-            editor.sync_from_shortcuts(shortcuts);
-            changed = true;
+        // ── Shortcut rows ──────────────────────────────────────────
+        for action in ShortcutAction::ALL {
+            shortcut_edit_row(ui, action, shortcuts, editor);
+            ui.add_space(2.0);
         }
+
+        // ── Error feedback ─────────────────────────────────────────
+        if let Some(err) = &editor.error {
+            ui.add_space(4.0);
+            let tokens = theme::tokens(ui);
+            ui.horizontal(|ui| {
+                ui.label(lucide_icon(Icon::CircleAlert, 12.0).color(tokens.accent));
+                ui.label(
+                    RichText::new(err.as_str())
+                        .size(11.0)
+                        .color(tokens.accent),
+                );
+            });
+        }
+
+        // ── Footer ─────────────────────────────────────────────────
+        ui.add_space(8.0);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let tokens = theme::tokens(ui);
+            let btn = egui::Button::new(
+                RichText::new("Restore Defaults")
+                    .size(11.0)
+                    .color(tokens.text_secondary),
+            )
+            .fill(tokens.surface_raised)
+            .stroke(Stroke::new(1.0, tokens.border))
+            .corner_radius(6);
+
+            if ui.add(btn).clicked() {
+                *shortcuts = ShortcutPreferences::default();
+                editor.sync_from_shortcuts(shortcuts);
+                // Note: changed flag is set via the outer mutable reference
+            }
+        });
     });
 
     changed
 }
 
-/// A single shortcut editing row. Returns `true` if the shortcut was changed.
+/// A single shortcut editing row.
 fn shortcut_edit_row(
     ui: &mut Ui,
     action: ShortcutAction,
     shortcuts: &mut ShortcutPreferences,
     editor: &mut ShortcutEditor,
-) -> bool {
+) {
     let current_binding = editor.preview_binding(action, shortcuts);
     let is_capturing = editor.is_capturing(action);
     let tokens = theme::tokens(ui);
@@ -217,9 +220,9 @@ fn shortcut_edit_row(
         .fill(if is_capturing {
             tokens.accent_dim
         } else {
-            tokens.surface
+            tokens.surface_raised
         })
-        .corner_radius(4)
+        .corner_radius(8)
         .stroke(if is_capturing {
             Stroke::new(1.0, tokens.accent)
         } else {
@@ -265,7 +268,7 @@ fn shortcut_edit_row(
                 .fill(if is_capturing {
                     tokens.accent_dim
                 } else {
-                    tokens.surface_raised
+                    tokens.surface
                 })
                 .stroke(Stroke::new(
                     1.0,
@@ -275,7 +278,7 @@ fn shortcut_edit_row(
                         tokens.border
                     },
                 ))
-                .corner_radius(4)
+                .corner_radius(6)
                 .min_size(Vec2::new(132.0, 28.0));
 
                 if ui.add(button).clicked() {
@@ -304,8 +307,6 @@ fn shortcut_edit_row(
                 );
             }
         });
-
-    false
 }
 
 // ── Key badge rendering ────────────────────────────────────────────────────
@@ -339,17 +340,17 @@ fn key_badge(ui: &mut Ui, label: &str) {
         )
     });
 
-    let padding = Vec2::new(5.0, 2.0);
+    let padding = Vec2::new(6.0, 3.0);
     let desired = galley.size() + padding * 2.0;
-    let min_width = 20.0_f32;
-    let size = Vec2::new(desired.x.max(min_width), desired.y.max(18.0));
+    let min_width = 22.0_f32;
+    let size = Vec2::new(desired.x.max(min_width), desired.y.max(20.0));
 
     let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
 
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
-        let rounding = CornerRadius::same(3);
-        painter.rect_filled(rect, rounding, tokens.surface_raised);
+        let rounding = CornerRadius::same(4);
+        painter.rect_filled(rect, rounding, tokens.surface);
         painter.rect_stroke(
             rect,
             rounding,
@@ -368,10 +369,10 @@ fn key_badge(ui: &mut Ui, label: &str) {
 
 fn pretty_key(key: &str) -> String {
     match key.to_ascii_lowercase().as_str() {
-        "arrowup" => "↑".to_string(),
-        "arrowdown" => "↓".to_string(),
-        "arrowleft" => "←".to_string(),
-        "arrowright" => "→".to_string(),
+        "arrowup" => "\u{2191}".to_string(),
+        "arrowdown" => "\u{2193}".to_string(),
+        "arrowleft" => "\u{2190}".to_string(),
+        "arrowright" => "\u{2192}".to_string(),
         "escape" => "Esc".to_string(),
         "enter" | "return" => "Enter".to_string(),
         "space" => "Space".to_string(),
