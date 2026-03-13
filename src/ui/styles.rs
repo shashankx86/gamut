@@ -29,7 +29,18 @@ pub(super) fn panel_style(
             width: 1.0,
             radius: layout.panel_radius.into(),
         },
-        shadow: Shadow::default(),
+        shadow: Shadow {
+            color: Color {
+                a: if appearance.panel_background.r > 0.5 {
+                    0.16
+                } else {
+                    0.34
+                },
+                ..Color::BLACK
+            },
+            offset: iced::Vector::new(0.0, 18.0),
+            blur_radius: 42.0,
+        },
         ..container::Style::default()
     }
 }
