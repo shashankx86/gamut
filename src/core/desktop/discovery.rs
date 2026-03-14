@@ -1,9 +1,9 @@
 use super::icons::resolve_app_icon;
 use super::model::{DesktopApp, IconResolveRequest};
 use freedesktop_desktop_entry::{
-    DesktopEntry, Iter, PathSource, default_paths, get_languages_from_env,
+    default_paths, get_languages_from_env, DesktopEntry, Iter, PathSource,
 };
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{hash_map::Entry, HashMap};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -48,12 +48,10 @@ pub fn load_apps() -> Vec<DesktopApp> {
 }
 
 pub fn resolve_icon_requests(requests: Vec<IconResolveRequest>) -> Vec<(usize, Option<PathBuf>)> {
-    let mut icon_cache: HashMap<String, Option<PathBuf>> = HashMap::new();
-
     requests
         .into_iter()
         .map(|request| {
-            let icon_path = resolve_app_icon(&request, &mut icon_cache);
+            let icon_path = resolve_app_icon(&request);
             (request.index, icon_path)
         })
         .collect()
@@ -169,7 +167,7 @@ fn canonical_name_for_dedupe(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{DesktopApp, ScoredApp, dedupe_key, should_replace_existing};
+    use super::{dedupe_key, should_replace_existing, DesktopApp, ScoredApp};
 
     fn app(name: &str, command: &str, exec_line: &str, args: Vec<&str>) -> DesktopApp {
         DesktopApp::new(

@@ -1,16 +1,16 @@
-use super::TrayService;
 use super::icon;
+use super::{TrayController, TrayService};
 use crate::core::app_command::AppCommand;
 use crate::core::assets::asset_theme;
-use crate::core::display_target::active_output_name;
-use crate::core::preferences::{AppPreferences, load_preferences};
+use crate::core::preferences::AppPreferences;
 use gtk::glib;
+use gtk::prelude::*;
 use log::{error, info};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread;
-use std::time::Duration;
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
@@ -23,18 +23,24 @@ const TRAY_TOOLTIP: &str = "Gamut";
 pub(super) fn start(
     command_tx: Sender<AppCommand>,
     preferences: AppPreferences,
-) -> Result<TrayService, Box<dyn std::error::Error>> {
+) -> Result<(TrayService, TrayController), Box<dyn std::error::Error>> {
     info!("starting tray service");
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+    let (preferences_tx, preferences_rx) = mpsc::channel();
 
     let thread = thread::Builder::new()
         .name("gamut-tray".to_string())
-        .spawn(move || run_tray_loop(ready_tx, command_tx, preferences))?;
+        .spawn(move || run_tray_loop(ready_tx, command_tx, preferences, preferences_rx))?;
 
     match ready_rx.recv() {
         Ok(Ok(())) => {
             info!("tray service ready");
-            Ok(TrayService::from_thread(thread))
+            Ok((
+                TrayService::from_thread(thread),
+                TrayController {
+                    sender: preferences_tx,
+                },
+            ))
         }
         Ok(Err(error)) => Err(error.into()),
         Err(error) => {
@@ -47,8 +53,9 @@ fn run_tray_loop(
     ready_tx: mpsc::SyncSender<Result<(), String>>,
     command_tx: Sender<AppCommand>,
     preferences: AppPreferences,
+    preferences_rx: mpsc::Receiver<AppPreferences>,
 ) {
-    if let Err(error) = run_tray_loop_inner(&ready_tx, command_tx, preferences) {
+    if let Err(error) = run_tray_loop_inner(&ready_tx, command_tx, preferences, preferences_rx) {
         let _ = ready_tx.send(Err(error.to_string()));
         error!("{error}");
     }
@@ -58,6 +65,7 @@ fn run_tray_loop_inner(
     ready_tx: &mpsc::SyncSender<Result<(), String>>,
     command_tx: Sender<AppCommand>,
     preferences: AppPreferences,
+    preferences_rx: mpsc::Receiver<AppPreferences>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     gtk::init()?;
 
@@ -75,7 +83,7 @@ fn run_tray_loop_inner(
             .build()?,
     );
 
-    install_theme_refresh(Rc::clone(&tray_icon));
+    install_theme_refresh(Rc::clone(&tray_icon), preferences, preferences_rx);
 
     ready_tx
         .send(Ok(()))
@@ -102,22 +110,50 @@ fn build_tray_menu() -> Result<Menu, Box<dyn std::error::Error>> {
     Ok(menu)
 }
 
-fn install_theme_refresh(tray_icon: Rc<TrayIcon>) {
-    let mut last_theme = asset_theme(&load_preferences().appearance);
+fn install_theme_refresh(
+    tray_icon: Rc<TrayIcon>,
+    preferences: AppPreferences,
+    preferences_rx: mpsc::Receiver<AppPreferences>,
+) {
+    let preferences = Rc::new(RefCell::new(preferences));
+    #[allow(deprecated)]
+    let (preferences_tx, preferences_updates) =
+        glib::MainContext::channel::<AppPreferences>(glib::Priority::default());
 
-    glib::timeout_add_local(Duration::from_millis(900), move || {
-        let next_theme = asset_theme(&load_preferences().appearance);
+    let tray_icon_for_updates = Rc::clone(&tray_icon);
+    let preferences_for_updates = Rc::clone(&preferences);
+    preferences_updates.attach(None, move |next_preferences| {
+        *preferences_for_updates.borrow_mut() = next_preferences;
+        refresh_tray_icon(&tray_icon_for_updates, &preferences_for_updates.borrow());
+        glib::ControlFlow::Continue
+    });
 
-        if next_theme != last_theme {
-            match icon::load(next_theme)
-                .and_then(|icon| tray_icon.set_icon(Some(icon)).map_err(Into::into))
-            {
-                Ok(()) => last_theme = next_theme,
-                Err(error) => error!("failed to update tray icon theme: {error}"),
+    if let Some(settings) = gtk::Settings::default() {
+        let tray_icon_for_dark_notify = Rc::clone(&tray_icon);
+        let preferences_for_dark_notify = Rc::clone(&preferences);
+        settings.connect_gtk_application_prefer_dark_theme_notify(move |_| {
+            refresh_tray_icon(
+                &tray_icon_for_dark_notify,
+                &preferences_for_dark_notify.borrow(),
+            );
+        });
+
+        let tray_icon_for_theme_notify = Rc::clone(&tray_icon);
+        let preferences_for_theme_notify = Rc::clone(&preferences);
+        settings.connect_gtk_theme_name_notify(move |_| {
+            refresh_tray_icon(
+                &tray_icon_for_theme_notify,
+                &preferences_for_theme_notify.borrow(),
+            );
+        });
+    }
+
+    thread::spawn(move || {
+        while let Ok(next_preferences) = preferences_rx.recv() {
+            if preferences_tx.send(next_preferences).is_err() {
+                break;
             }
         }
-
-        glib::ControlFlow::Continue
     });
 }
 
@@ -150,12 +186,38 @@ fn handle_menu_event(event: MenuEvent, command_tx: &Sender<AppCommand>) {
 
 fn show_command() -> AppCommand {
     AppCommand::ShowLauncher {
-        target_output: active_output_name(),
+        target_output: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::show_command;
+    use crate::core::app_command::AppCommand;
+
+    #[test]
+    fn tray_show_command_avoids_target_output_lookup() {
+        assert_eq!(
+            show_command(),
+            AppCommand::ShowLauncher {
+                target_output: None,
+            }
+        );
     }
 }
 
 fn dispatch(command_tx: &Sender<AppCommand>, command: AppCommand) {
     if let Err(error) = command_tx.send(command.clone()) {
         error!("failed to dispatch tray command {:?}: {error}", command);
+    }
+}
+
+fn refresh_tray_icon(tray_icon: &TrayIcon, preferences: &AppPreferences) {
+    let next_theme = asset_theme(&preferences.appearance);
+
+    if let Err(error) =
+        icon::load(next_theme).and_then(|icon| tray_icon.set_icon(Some(icon)).map_err(Into::into))
+    {
+        error!("failed to update tray icon theme: {error}");
     }
 }

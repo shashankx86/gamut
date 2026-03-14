@@ -99,13 +99,11 @@ pub fn segmented_control(ui: &mut Ui, selected: usize, labels: &[&str]) -> Optio
                         (Color32::TRANSPARENT, tokens.text_secondary)
                     };
 
-                    let btn = egui::Button::new(
-                        RichText::new(*label).size(11.0).color(text_color),
-                    )
-                    .fill(btn_bg)
-                    .stroke(Stroke::NONE)
-                    .corner_radius(4)
-                    .min_size(Vec2::new(64.0, 24.0));
+                    let btn = egui::Button::new(RichText::new(*label).size(11.0).color(text_color))
+                        .fill(btn_bg)
+                        .stroke(Stroke::NONE)
+                        .corner_radius(4)
+                        .min_size(Vec2::new(64.0, 24.0));
 
                     if ui.add(btn).clicked() && !is_active {
                         result = Some(idx);
@@ -187,8 +185,7 @@ pub fn color_swatch(ui: &mut Ui, hex_value: &str) {
 
     if ui.is_rect_visible(rect) {
         let color = parse_color32(hex_value).unwrap_or(tokens.muted);
-        ui.painter()
-            .rect_filled(rect, CornerRadius::same(4), color);
+        ui.painter().rect_filled(rect, CornerRadius::same(4), color);
         ui.painter().rect_stroke(
             rect,
             CornerRadius::same(4),

@@ -1,6 +1,6 @@
 use super::Launcher;
-use crate::core::desktop::{DesktopApp, normalize_query};
-use crate::core::search::{ApplicationSearchResponse, rank_applications};
+use crate::core::desktop::{normalize_query, DesktopApp};
+use crate::core::search::{rank_applications, ApplicationSearchResponse};
 use log::error;
 
 impl Launcher {
@@ -129,7 +129,7 @@ mod tests {
 
     fn launcher() -> Launcher {
         let (_tx, rx) = mpsc::channel::<AppCommand>();
-        let (launcher, _) = Launcher::new(rx);
+        let (launcher, _) = Launcher::new(rx, crate::core::tray::TrayController::detached());
         launcher
     }
 

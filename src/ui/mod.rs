@@ -4,7 +4,7 @@ mod layout;
 mod preferences;
 mod styles;
 mod surface;
-mod theme;
+pub(crate) mod theme;
 mod view;
 
 use iced::Theme;
@@ -18,23 +18,34 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 
 use crate::core::app_command::AppCommand;
+use crate::core::tray::TrayController;
 use styles::launcher_base_style;
 
 type DynError = Box<dyn Error>;
 
-pub fn run_daemon(command_rx: Receiver<AppCommand>) -> Result<(), DynError> {
+pub fn run_daemon(
+    command_rx: Receiver<AppCommand>,
+    tray_controller: TrayController,
+) -> Result<(), DynError> {
     let command_rx = Arc::new(Mutex::new(Some(command_rx)));
+    let tray_controller = Arc::new(Mutex::new(Some(tray_controller)));
 
     daemon(
         {
             let command_rx = Arc::clone(&command_rx);
+            let tray_controller = Arc::clone(&tray_controller);
             move || {
                 let receiver = command_rx
                     .lock()
                     .expect("app command receiver poisoned")
                     .take()
                     .expect("launcher boot called more than once");
-                Launcher::new(receiver)
+                let tray_controller = tray_controller
+                    .lock()
+                    .expect("tray controller poisoned")
+                    .take()
+                    .expect("launcher boot called more than once");
+                Launcher::new(receiver, tray_controller)
             }
         },
         surface::namespace,

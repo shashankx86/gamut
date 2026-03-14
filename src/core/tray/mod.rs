@@ -15,6 +15,23 @@ use crate::core::preferences::AppPreferences;
 
 type DynError = Box<dyn Error>;
 
+#[derive(Clone)]
+pub(crate) struct TrayController {
+    pub(crate) sender: std::sync::mpsc::Sender<AppPreferences>,
+}
+
+impl TrayController {
+    pub(crate) fn update_preferences(&self, preferences: AppPreferences) {
+        let _ = self.sender.send(preferences);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn detached() -> Self {
+        let (sender, _receiver) = std::sync::mpsc::channel();
+        Self { sender }
+    }
+}
+
 pub(crate) struct TrayService {
     _thread: Option<JoinHandle<()>>,
 }
@@ -36,7 +53,7 @@ impl TrayService {
 pub(crate) fn start(
     command_tx: Sender<AppCommand>,
     preferences: AppPreferences,
-) -> Result<TrayService, DynError> {
+) -> Result<(TrayService, TrayController), DynError> {
     #[cfg(target_os = "linux")]
     {
         linux::start(command_tx, preferences)

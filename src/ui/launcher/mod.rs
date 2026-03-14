@@ -8,19 +8,24 @@ mod update;
 
 use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
-use super::theme::{ResolvedAppearance, resolve_appearance, resolve_theme};
+use super::theme::{ResolvedAppearance, resolve_appearance, resolve_asset_theme, resolve_theme};
 use crate::core::app_command::AppCommand;
+use crate::core::assets::launcher_logo_svg;
 use crate::core::desktop::{
-    DesktopApp, IconResolveRequest, load_cached_apps, refresh_app_cache, resolve_icon_requests,
+    DesktopApp, IconResolveRequest, load_cached_app_catalog, refresh_app_cache,
+    resolve_icon_requests, save_cached_apps,
 };
 use crate::core::ipc::{IpcCommand, start_listener};
 use crate::core::preferences::{AppPreferences, load_preferences};
+use crate::core::tray::TrayController;
 use crate::core::search::{ApplicationSearchEngine, ApplicationSearchResponse};
 use iced::Size;
 use iced::keyboard::Modifiers;
+use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{self, scrollable};
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
+use log::warn;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
@@ -122,12 +127,21 @@ pub(super) struct Launcher {
     pub(super) manually_expanded: bool,
     layout_preferences: LauncherPreferences,
     pub(super) app_preferences: AppPreferences,
+    visual_cache: LauncherVisualCache,
+    tray_controller: TrayController,
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
     app_search_engine: ApplicationSearchEngine,
     search_results_handle: SearchResultsReceiverHandle,
     ipc_handle: IpcReceiverHandle,
     app_command_handle: AppCommandReceiverHandle,
+}
+
+#[derive(Clone)]
+struct LauncherVisualCache {
+    appearance: ResolvedAppearance,
+    window_theme: iced::Theme,
+    logo_handle: SvgHandle,
 }
 
 #[to_layer_message(multi)]
@@ -153,19 +167,27 @@ pub(super) enum Message {
 }
 
 impl Launcher {
-    pub(super) fn new(command_receiver: Receiver<AppCommand>) -> (Self, Task<Message>) {
+    pub(super) fn new(
+        command_receiver: Receiver<AppCommand>,
+        tray_controller: TrayController,
+    ) -> (Self, Task<Message>) {
         let layout_preferences = LauncherPreferences::load_from_env();
         let app_preferences = load_preferences();
         let layout = LauncherLayout::from_monitor_size(None, &layout_preferences, &app_preferences);
+        let visual_cache = Self::build_visual_cache(&app_preferences);
         let input_id = widget::Id::unique();
         let results_scroll_id = widget::Id::unique();
-        let cached_apps = load_cached_apps();
+        let cached_catalog = load_cached_app_catalog();
         let (app_search_engine, search_results_receiver) =
             ApplicationSearchEngine::spawn(MAX_RESULTS);
         let (ipc_handle, startup_task) = match start_listener() {
             Ok(receiver) => (
                 IpcReceiverHandle::new(receiver),
-                Task::perform(async { refresh_app_cache() }, Message::AppsLoaded),
+                if cached_catalog.needs_refresh {
+                    Task::perform(async { refresh_app_cache() }, Message::AppsLoaded)
+                } else {
+                    Task::none()
+                },
             ),
             Err(error) => {
                 let (_tx, receiver) = mpsc::channel();
@@ -205,6 +227,8 @@ impl Launcher {
             manually_expanded: false,
             layout_preferences,
             app_preferences,
+            visual_cache,
+            tray_controller,
             modifiers: Modifiers::default(),
             icon_resolve_in_flight: false,
             app_search_engine,
@@ -213,8 +237,8 @@ impl Launcher {
             app_command_handle: AppCommandReceiverHandle::new(command_receiver),
         };
 
-        if !cached_apps.is_empty() {
-            launcher.set_apps(cached_apps);
+        if !cached_catalog.apps.is_empty() {
+            launcher.set_apps(cached_catalog.apps);
         }
 
         (launcher, startup_task)
@@ -326,13 +350,20 @@ impl Launcher {
     }
 
     pub(super) fn apply_resolved_icons(&mut self, updates: Vec<(usize, Option<PathBuf>)>) {
+        let mut changed = false;
+
         for (index, icon_path) in updates {
             if let Some(path) = icon_path
                 && let Some(app) = self.apps.get_mut(index)
                 && app.icon_path.is_none()
             {
                 app.icon_path = Some(path);
+                changed = true;
             }
+        }
+
+        if changed && let Err(error) = save_cached_apps(&self.apps) {
+            warn!("failed to persist resolved icon paths: {error}");
         }
 
         self.icon_resolve_in_flight = false;
@@ -400,15 +431,22 @@ impl Launcher {
 
     pub(super) fn reload_preferences_from_disk(&mut self) -> Task<Message> {
         self.app_preferences = load_preferences();
+        self.refresh_visual_cache();
+        self.tray_controller
+            .update_preferences(self.app_preferences.clone());
         self.update_layout(self.monitor_size)
     }
 
     pub(super) fn resolved_appearance(&self) -> ResolvedAppearance {
-        resolve_appearance(&self.app_preferences.appearance)
+        self.visual_cache.appearance
     }
 
     pub(super) fn window_theme(&self) -> iced::Theme {
-        resolve_theme(&self.app_preferences.appearance)
+        self.visual_cache.window_theme.clone()
+    }
+
+    pub(super) fn launcher_logo_handle(&self) -> SvgHandle {
+        self.visual_cache.logo_handle.clone()
     }
 
     pub(super) fn window_theme_for(&self, id: window::Id) -> iced::Theme {
@@ -423,5 +461,23 @@ impl Launcher {
 
     pub(super) fn is_launcher_window(&self, id: window::Id) -> bool {
         self.launcher_window_id == Some(id)
+    }
+
+    fn refresh_visual_cache(&mut self) {
+        self.visual_cache = Self::build_visual_cache(&self.app_preferences);
+    }
+
+    fn build_visual_cache(app_preferences: &AppPreferences) -> LauncherVisualCache {
+        let appearance = resolve_appearance(&app_preferences.appearance);
+        let window_theme = resolve_theme(&app_preferences.appearance);
+        let logo_handle = SvgHandle::from_memory(launcher_logo_svg(resolve_asset_theme(
+            &app_preferences.appearance,
+        )));
+
+        LauncherVisualCache {
+            appearance,
+            window_theme,
+            logo_handle,
+        }
     }
 }

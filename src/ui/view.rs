@@ -3,10 +3,7 @@ use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style,
 };
-use super::theme::resolve_asset_theme;
-use crate::core::assets::launcher_logo_svg;
 use crate::core::desktop::{trim_label, DesktopApp};
-use iced::widget::svg::Handle as SvgHandle;
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
 use iced::{window, ContentFit, Element, Length};
 use iced_shadcn::{
@@ -230,11 +227,9 @@ impl Launcher {
         };
 
         let logo = container(
-            svg(SvgHandle::from_memory(launcher_logo_svg(
-                resolve_asset_theme(&self.app_preferences.appearance),
-            )))
-            .width(Length::Fixed(self.layout.logo_width))
-            .height(Length::Fixed(self.layout.logo_height)),
+            svg(self.launcher_logo_handle())
+                .width(Length::Fixed(self.layout.logo_width))
+                .height(Length::Fixed(self.layout.logo_height)),
         )
         .padding([0, 4])
         .center_y(Length::Fill);
@@ -399,7 +394,7 @@ mod tests {
 
     fn launcher_with_results(total_results: usize) -> Launcher {
         let (_tx, rx) = mpsc::channel::<AppCommand>();
-        let (mut launcher, _) = Launcher::new(rx);
+        let (mut launcher, _) = Launcher::new(rx, crate::core::tray::TrayController::detached());
         launcher.apps = (0..total_results).map(app).collect();
         launcher.all_app_indices = (0..launcher.apps.len()).collect();
         launcher.filtered_indices = launcher.all_app_indices.clone();

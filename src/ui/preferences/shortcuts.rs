@@ -172,11 +172,7 @@ pub fn render_shortcuts(
             let tokens = theme::tokens(ui);
             ui.horizontal(|ui| {
                 ui.label(lucide_icon(Icon::CircleAlert, 12.0).color(tokens.accent));
-                ui.label(
-                    RichText::new(err.as_str())
-                        .size(11.0)
-                        .color(tokens.accent),
-                );
+                ui.label(RichText::new(err.as_str()).size(11.0).color(tokens.accent));
             });
         }
 
@@ -196,7 +192,7 @@ pub fn render_shortcuts(
             if ui.add(btn).clicked() {
                 *shortcuts = ShortcutPreferences::default();
                 editor.sync_from_shortcuts(shortcuts);
-                // Note: changed flag is set via the outer mutable reference
+                changed = true;
             }
         });
     });

@@ -4,7 +4,7 @@ mod shortcuts;
 mod system;
 
 pub use appearance::{
-    AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
+    normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
 };
 pub use layout::{LauncherPlacement, LauncherSize, LayoutPreferences, RadiusPreference};
 pub use shortcuts::{ShortcutBinding, ShortcutPreferences};
@@ -35,8 +35,8 @@ impl Default for AppPreferences {
 #[cfg(test)]
 mod tests {
     use super::{
-        AppPreferences, LauncherPlacement, RadiusPreference, ShortcutBinding, ShortcutPreferences,
-        ThemePreference,
+        AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ShortcutBinding,
+        ShortcutPreferences, ThemePreference,
     };
     use std::str::FromStr;
 
@@ -46,7 +46,7 @@ mod tests {
 
         assert_eq!(preferences.appearance.theme, ThemePreference::System);
         assert_eq!(preferences.appearance.radius, RadiusPreference::Small);
-        assert_eq!(preferences.layout.size.label(), "Medium");
+        assert_eq!(preferences.layout.size, LauncherSize::Medium);
         assert_eq!(
             preferences.layout.placement,
             LauncherPlacement::RaisedCenter

@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
-use iced::keyboard::{self, Key, Modifiers, key::Named};
+use iced::keyboard::{self, key::Named, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{Task, window};
+use iced::{window, Task};
 
 impl Launcher {
     pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
@@ -326,7 +326,7 @@ mod tests {
 
     fn launcher_with_results(total_results: usize) -> Launcher {
         let (_tx, rx) = mpsc::channel::<AppCommand>();
-        let (mut launcher, _) = Launcher::new(rx);
+        let (mut launcher, _) = Launcher::new(rx, crate::core::tray::TrayController::detached());
         launcher.apps = (0..total_results).map(app).collect();
         launcher.all_app_indices = (0..launcher.apps.len()).collect();
         launcher.filtered_indices = launcher.all_app_indices.clone();

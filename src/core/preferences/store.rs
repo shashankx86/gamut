@@ -1,5 +1,6 @@
 use super::model::AppPreferences;
-use crate::core::storage::{app_config_path, write_atomic};
+use crate::core::storage::app_config_path;
+use crate::core::storage::write_atomic;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -33,7 +34,7 @@ fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Re
 #[cfg(test)]
 mod tests {
     use super::{
-        AppPreferences, load_preferences_from_path, preferences_path, save_preferences_to_path,
+        load_preferences_from_path, preferences_path, save_preferences_to_path, AppPreferences,
     };
     use std::fs;
     use std::path::PathBuf;

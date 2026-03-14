@@ -55,10 +55,6 @@ impl ThemeEditorState {
         }
     }
 
-    pub fn sync_from_preferences(&mut self, preferences: &AppPreferences) {
-        *self = Self::from_preferences(preferences);
-    }
-
     pub fn theme_value(&self, scheme: ThemeSchemeId, field: ThemeColorField) -> &str {
         match (scheme, field) {
             (ThemeSchemeId::Light, ThemeColorField::Background) => &self.light_background,
@@ -93,6 +89,15 @@ impl ThemeEditorState {
     pub fn set_theme_error(&mut self, error: Option<String>) {
         self.theme_error = error;
     }
+
+    pub fn apply_preferences(&mut self, preferences: &AppPreferences) {
+        self.light_background = preferences.appearance.schemes.light.background.clone();
+        self.light_text = preferences.appearance.schemes.light.text.clone();
+        self.light_accent = preferences.appearance.schemes.light.accent.clone();
+        self.dark_background = preferences.appearance.schemes.dark.background.clone();
+        self.dark_text = preferences.appearance.schemes.dark.text.clone();
+        self.dark_accent = preferences.appearance.schemes.dark.accent.clone();
+    }
 }
 
 pub fn update_theme_scheme_color(
@@ -118,7 +123,7 @@ pub fn update_theme_scheme_color(
         ThemeColorField::Accent => colors.accent = normalized,
     }
 
-    editor.sync_from_preferences(preferences);
+    editor.apply_preferences(preferences);
     Ok(())
 }
 
@@ -190,8 +195,8 @@ pub fn shortcut_preferences_from_values(
             if same_shortcut(left_binding, right_binding) {
                 return Err(format!(
                     "{} conflicts with {}.",
-                    left_action.label(),
-                    right_action.label()
+                    (*left_action).label(),
+                    (*right_action).label()
                 ));
             }
         }

@@ -10,22 +10,28 @@ use crate::core::preferences::{load_preferences, save_preferences, AppPreference
 use general::GeneralActions;
 use model::{update_theme_scheme_color, ThemeColorField, ThemeEditorState};
 use shortcuts::ShortcutEditor;
+use std::time::{Duration, Instant};
 use tabs::PreferencesTab;
 
 const WINDOW_WIDTH: f32 = 780.0;
 const WINDOW_HEIGHT: f32 = 560.0;
+const SAVE_DEBOUNCE_WINDOW: Duration = Duration::from_millis(250);
 
 struct PreferencesApp {
     preferences: AppPreferences,
     active_tab: PreferencesTab,
     theme_editor: ThemeEditorState,
     shortcut_editor: ShortcutEditor,
+    current_tokens: theme::PreferenceThemeTokens,
+    theme_dirty: bool,
+    dirty_since: Option<Instant>,
 }
 
 impl PreferencesApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         register_lucide_font(&cc.egui_ctx);
         let prefs = load_preferences();
+        let current_tokens = theme::tokens_from_preferences(&prefs);
         theme::apply_theme(&cc.egui_ctx, &prefs);
         let theme_editor = ThemeEditorState::from_preferences(&prefs);
         let editor = ShortcutEditor::from_shortcuts(&prefs.shortcuts);
@@ -35,22 +41,49 @@ impl PreferencesApp {
             active_tab: PreferencesTab::General,
             theme_editor,
             shortcut_editor: editor,
+            current_tokens,
+            theme_dirty: true,
+            dirty_since: None,
         }
     }
 
-    fn persist(&self) {
+    fn persist(&mut self) {
         if let Err(error) = save_preferences(&self.preferences) {
             eprintln!("failed to save preferences: {error}");
             return;
         }
 
+        self.current_tokens = theme::tokens_from_preferences(&self.preferences);
+        self.theme_dirty = false;
+        self.dirty_since = None;
         let _ = send_command(IpcCommand::ReloadPreferences);
+    }
+
+    fn mark_dirty(&mut self) {
+        if self.dirty_since.is_none() {
+            self.dirty_since = Some(Instant::now());
+        }
+    }
+
+    fn mark_visual_dirty(&mut self) {
+        self.mark_dirty();
+        self.theme_dirty = true;
+    }
+
+    fn flush_pending_persist(&mut self) {
+        if self
+            .dirty_since
+            .is_some_and(|started_at| started_at.elapsed() >= SAVE_DEBOUNCE_WINDOW)
+        {
+            self.persist();
+        }
     }
 
     fn reset_to_defaults(&mut self) {
         self.preferences = AppPreferences::default();
         self.theme_editor = ThemeEditorState::from_preferences(&self.preferences);
         self.shortcut_editor = ShortcutEditor::from_shortcuts(&self.preferences.shortcuts);
+        self.theme_dirty = true;
         self.persist();
     }
 
@@ -69,7 +102,7 @@ impl PreferencesApp {
         ) {
             Ok(()) => {
                 self.theme_editor.set_theme_error(None);
-                self.persist();
+                self.mark_visual_dirty();
             }
             Err(error) => self.theme_editor.set_theme_error(Some(error)),
         }
@@ -78,8 +111,15 @@ impl PreferencesApp {
 
 impl eframe::App for PreferencesApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        theme::apply_theme(ctx, &self.preferences);
-        let tokens = theme::tokens_from_preferences(&self.preferences);
+        if self.theme_dirty {
+            self.current_tokens = theme::tokens_from_preferences(&self.preferences);
+            theme::apply_theme(ctx, &self.preferences);
+            self.theme_dirty = false;
+        }
+
+        let tokens = self.current_tokens.clone();
+
+        self.flush_pending_persist();
 
         // Sidebar
         let mut reset_requested = false;
@@ -135,7 +175,7 @@ impl eframe::App for PreferencesApp {
                                 }
 
                                 if changed {
-                                    self.persist();
+                                    self.mark_visual_dirty();
                                 }
 
                                 if let Some(error) = self.theme_editor.theme_error() {
@@ -152,12 +192,22 @@ impl eframe::App for PreferencesApp {
                                     &mut self.preferences.shortcuts,
                                     &mut self.shortcut_editor,
                                 ) {
-                                    self.persist();
+                                    self.mark_dirty();
                                 }
                             }
                         }
                     });
             });
+
+        if self.dirty_since.is_some() {
+            ctx.request_repaint_after(SAVE_DEBOUNCE_WINDOW);
+        }
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if self.dirty_since.is_some() {
+            self.persist();
+        }
     }
 }
 

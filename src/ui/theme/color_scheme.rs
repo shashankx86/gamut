@@ -40,8 +40,6 @@ fn light_scheme(seed: ThemeSeed) -> ResolvedAppearance {
 
     ResolvedAppearance {
         panel_background,
-        panel_surface,
-        panel_surface_raised,
         panel_border: mix(primary_text, panel_background, 0.80),
         primary_text,
         secondary_text,
@@ -81,8 +79,6 @@ fn dark_scheme(seed: ThemeSeed) -> ResolvedAppearance {
 
     ResolvedAppearance {
         panel_background,
-        panel_surface,
-        panel_surface_raised,
         panel_border: mix(primary_text, panel_background, 0.84),
         primary_text,
         secondary_text,

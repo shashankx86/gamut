@@ -3,23 +3,26 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 const GENERIC_ICON_CACHE_KEY: &str = "__generic_app_icon__";
+const PREFERRED_THEMES: &[&str] = &["breeze-dark", "breeze", "Adwaita", "hicolor"];
 
-pub(super) fn resolve_app_icon(
-    request: &IconResolveRequest,
-    icon_cache: &mut HashMap<String, Option<PathBuf>>,
-) -> Option<PathBuf> {
-    resolve_icon_path(request.icon_name.as_deref(), icon_cache)
+pub(super) fn resolve_app_icon(request: &IconResolveRequest) -> Option<PathBuf> {
+    let mut icon_cache = icon_lookup_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    resolve_icon_path(request.icon_name.as_deref(), &mut icon_cache)
         .or_else(|| {
             resolve_context_icon_path(
                 &request.icon_categories,
                 &request.name,
                 &request.exec_line,
-                icon_cache,
+                &mut icon_cache,
             )
         })
-        .or_else(|| resolve_generic_icon_path(icon_cache))
+        .or_else(|| resolve_generic_icon_path(&mut icon_cache))
 }
 
 fn resolve_icon_path(
@@ -167,39 +170,9 @@ fn find_icon_file(icon: &str) -> Option<PathBuf> {
         }
     }
 
-    let roots = icon_theme_roots();
-
-    for preferred_theme in ["breeze-dark", "breeze", "Adwaita", "hicolor"] {
-        for root in &roots {
-            let theme_dir = root.join(preferred_theme);
-            if let Some(path) = find_icon_in_theme(&theme_dir, &candidates) {
-                return Some(path);
-            }
-        }
-    }
-
-    for root in roots {
-        let Ok(entries) = fs::read_dir(root) else {
-            continue;
-        };
-
-        let mut themes: Vec<PathBuf> = entries
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.is_dir())
-            .collect();
-        themes.sort();
-
-        for theme_dir in themes {
-            if let Some(name) = theme_dir.file_name().and_then(|name| name.to_str())
-                && matches!(name, "breeze" | "breeze-dark" | "hicolor" | "Adwaita")
-            {
-                continue;
-            }
-
-            if let Some(path) = find_icon_in_theme(&theme_dir, &candidates) {
-                return Some(path);
-            }
+    for theme_dir in icon_theme_search_dirs() {
+        if let Some(path) = find_icon_in_theme(theme_dir, &candidates) {
+            return Some(path);
         }
     }
 
@@ -284,29 +257,77 @@ fn find_icon_in_theme(theme_dir: &Path, candidates: &[String]) -> Option<PathBuf
     None
 }
 
-fn icon_theme_roots() -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = xdg_data_dirs()
-        .into_iter()
-        .map(|dir| dir.join("icons"))
-        .collect();
+fn icon_theme_roots() -> &'static [PathBuf] {
+    static ICON_THEME_ROOTS: OnceLock<Vec<PathBuf>> = OnceLock::new();
 
-    if let Some(home) = home_dir() {
-        roots.push(home.join(".icons"));
-    }
+    ICON_THEME_ROOTS.get_or_init(|| {
+        let mut roots: Vec<PathBuf> = xdg_data_dirs()
+            .into_iter()
+            .map(|dir| dir.join("icons"))
+            .collect();
 
-    dedupe_paths(roots)
+        if let Some(home) = home_dir() {
+            roots.push(home.join(".icons"));
+        }
+
+        dedupe_paths(roots)
+    })
 }
 
-fn pixmap_dirs() -> Vec<PathBuf> {
-    let mut dirs: Vec<PathBuf> = xdg_data_dirs()
-        .into_iter()
-        .map(|dir| dir.join("pixmaps"))
-        .collect();
+fn pixmap_dirs() -> &'static [PathBuf] {
+    static PIXMAP_DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
 
-    dirs.push(PathBuf::from("/usr/share/pixmaps"));
-    dirs.push(PathBuf::from("/usr/local/share/pixmaps"));
+    PIXMAP_DIRS.get_or_init(|| {
+        let mut dirs: Vec<PathBuf> = xdg_data_dirs()
+            .into_iter()
+            .map(|dir| dir.join("pixmaps"))
+            .collect();
 
-    dedupe_paths(dirs)
+        dirs.push(PathBuf::from("/usr/share/pixmaps"));
+        dirs.push(PathBuf::from("/usr/local/share/pixmaps"));
+
+        dedupe_paths(dirs)
+    })
+}
+
+fn icon_theme_search_dirs() -> &'static [PathBuf] {
+    static ICON_THEME_SEARCH_DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
+
+    ICON_THEME_SEARCH_DIRS.get_or_init(|| {
+        let roots = icon_theme_roots();
+        let mut search_dirs = Vec::new();
+
+        for preferred_theme in PREFERRED_THEMES {
+            for root in roots {
+                search_dirs.push(root.join(preferred_theme));
+            }
+        }
+
+        for root in roots {
+            let Ok(entries) = fs::read_dir(root) else {
+                continue;
+            };
+
+            let mut themes: Vec<PathBuf> = entries
+                .filter_map(Result::ok)
+                .map(|entry| entry.path())
+                .filter(|path| path.is_dir())
+                .collect();
+            themes.sort();
+
+            for theme_dir in themes {
+                if let Some(name) = theme_dir.file_name().and_then(|name| name.to_str())
+                    && PREFERRED_THEMES.contains(&name)
+                {
+                    continue;
+                }
+
+                search_dirs.push(theme_dir);
+            }
+        }
+
+        dedupe_paths(search_dirs)
+    })
 }
 
 fn xdg_data_dirs() -> Vec<PathBuf> {
@@ -339,4 +360,10 @@ fn dedupe_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
         .into_iter()
         .filter(|path| seen.insert(path.clone()))
         .collect()
+}
+
+fn icon_lookup_cache() -> &'static Mutex<HashMap<String, Option<PathBuf>>> {
+    static ICON_LOOKUP_CACHE: OnceLock<Mutex<HashMap<String, Option<PathBuf>>>> = OnceLock::new();
+
+    ICON_LOOKUP_CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }

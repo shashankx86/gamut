@@ -5,16 +5,16 @@ use crate::core::preferences::{AppearancePreferences, ThemePreference};
 use iced::theme::Palette;
 use iced::Theme;
 
-pub(in crate::ui) fn resolve_theme(preferences: &AppearancePreferences) -> Theme {
+pub(crate) fn resolve_theme(preferences: &AppearancePreferences) -> Theme {
     let resolved = resolve_palette(preferences);
     Theme::custom(theme_name(preferences.theme), resolved.palette)
 }
 
-pub(in crate::ui) fn resolve_appearance(preferences: &AppearancePreferences) -> ResolvedAppearance {
+pub(crate) fn resolve_appearance(preferences: &AppearancePreferences) -> ResolvedAppearance {
     resolve_palette(preferences).appearance
 }
 
-pub(in crate::ui) fn resolve_asset_theme(preferences: &AppearancePreferences) -> AssetTheme {
+pub(crate) fn resolve_asset_theme(preferences: &AppearancePreferences) -> AssetTheme {
     asset_theme(preferences)
 }
 

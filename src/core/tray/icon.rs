@@ -1,4 +1,4 @@
-use crate::core::assets::{AssetTheme, tray_icon_svg};
+use crate::core::assets::{tray_icon_svg, AssetTheme};
 #[cfg(target_os = "linux")]
 use resvg::tiny_skia::{Pixmap, Transform};
 #[cfg(target_os = "linux")]

@@ -1,9 +1,9 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use iced::{Task, window};
+use crate::core::preferences::launch_preferences_app;
+use iced::{window, Task};
 use log::error;
-use std::env;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -75,21 +75,7 @@ impl Launcher {
     }
 
     pub(super) fn open_preferences_window(&mut self) -> Task<Message> {
-        let current_exe = match env::current_exe() {
-            Ok(path) => path,
-            Err(error) => {
-                error!("failed to locate current executable for preferences window: {error}");
-                return Task::none();
-            }
-        };
-
-        if let Err(error) = Command::new(current_exe)
-            .arg("--preferences")
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::inherit())
-            .spawn()
-        {
+        if let Err(error) = launch_preferences_app() {
             error!("failed to open preferences window: {error}");
         }
 

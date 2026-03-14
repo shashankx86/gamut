@@ -3,7 +3,7 @@ use crate::ui::theme::resolve_appearance;
 use egui::style::{Selection, WidgetVisuals, Widgets};
 use egui::{Color32, Context, CornerRadius, Id, Stroke, Style, Ui, Visuals};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PreferenceThemeTokens {
     pub base: Color32,
     pub surface: Color32,
@@ -21,6 +21,11 @@ pub struct PreferenceThemeTokens {
 
 pub fn apply_theme(ctx: &Context, preferences: &AppPreferences) {
     let tokens = PreferenceThemeTokens::from_preferences(preferences);
+    if ctx.data(|data| data.get_temp::<PreferenceThemeTokens>(tokens_id())) == Some(tokens.clone())
+    {
+        return;
+    }
+
     let mut style = Style::default();
 
     style.visuals = Visuals {
@@ -74,12 +79,16 @@ pub fn tokens_from_preferences(preferences: &AppPreferences) -> PreferenceThemeT
 impl PreferenceThemeTokens {
     fn from_preferences(preferences: &AppPreferences) -> Self {
         let appearance = resolve_appearance(&preferences.appearance);
+        let base = to_color32(appearance.panel_background);
+        let border = to_color32(appearance.panel_border);
+        let surface = mix(base, border, 0.08);
+        let surface_raised = mix(base, border, 0.16);
 
         Self {
-            base: to_color32(appearance.panel_background),
-            surface: to_color32(appearance.panel_surface),
-            surface_raised: to_color32(appearance.panel_surface_raised),
-            border: to_color32(appearance.panel_border),
+            base,
+            surface,
+            surface_raised,
+            border,
             muted: to_color32(appearance.muted_text),
             text_secondary: to_color32(appearance.secondary_text),
             text_primary: to_color32(appearance.primary_text),
@@ -87,7 +96,7 @@ impl PreferenceThemeTokens {
             accent_dim: to_color32(appearance.accent_soft),
             hover_bg: to_color32(appearance.first_row_hover),
             separator: to_color32(appearance.divider),
-            is_dark: relative_luminance(to_color32(appearance.panel_background)) < 0.5,
+            is_dark: relative_luminance(base) < 0.5,
         }
     }
 

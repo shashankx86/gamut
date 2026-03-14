@@ -92,23 +92,19 @@ pub fn render_general(
                             .size(12.0)
                             .color(tokens.text_secondary),
                     );
-                    ui.with_layout(
-                        egui::Layout::right_to_left(egui::Align::Center),
-                        |ui| {
-                            let mut value =
-                                theme_editor.theme_value(scheme, field).to_string();
-                            let response = ui.add(
-                                egui::TextEdit::singleline(&mut value)
-                                    .desired_width(100.0)
-                                    .hint_text(field.placeholder()),
-                            );
-                            color_swatch(ui, theme_editor.theme_value(scheme, field));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let mut value = theme_editor.theme_value(scheme, field).to_string();
+                        let response = ui.add(
+                            egui::TextEdit::singleline(&mut value)
+                                .desired_width(100.0)
+                                .hint_text(field.placeholder()),
+                        );
+                        color_swatch(ui, theme_editor.theme_value(scheme, field));
 
-                            if response.changed() {
-                                actions.theme_updates.push((scheme, field, value));
-                            }
-                        },
-                    );
+                        if response.changed() {
+                            actions.theme_updates.push((scheme, field, value));
+                        }
+                    });
                 });
             }
 
@@ -134,17 +130,14 @@ pub fn render_general(
         thin_separator(ui);
 
         setting_row(ui, "Position", |ui| {
-            let placement_options =
-                [LauncherPlacement::Center, LauncherPlacement::RaisedCenter];
+            let placement_options = [LauncherPlacement::Center, LauncherPlacement::RaisedCenter];
             let placement_labels = ["Center", "Elevated"];
             let placement_index = placement_options
                 .iter()
                 .position(|&p| p == prefs.layout.placement)
                 .unwrap_or(1);
 
-            if let Some(new_idx) =
-                segmented_control(ui, placement_index, &placement_labels)
-            {
+            if let Some(new_idx) = segmented_control(ui, placement_index, &placement_labels) {
                 prefs.layout.placement = placement_options[new_idx];
                 actions.changed = true;
             }
