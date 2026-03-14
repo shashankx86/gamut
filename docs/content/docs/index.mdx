@@ -1,13 +1,30 @@
 ---
-title: Hello World
-description: Your first document
+title: Introduction
+description: Gamut is a fast, keyboard-driven application launcher for Linux desktops.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+Gamut is a keyboard-driven application launcher for Linux. It runs as a lightweight background daemon
+and surfaces a launcher overlay on demand — letting you find and open applications without reaching for the mouse.
 
-## What is Next?
+## Key features
+
+- **Instant toggle** — summon and dismiss the launcher with a single command or keyboard shortcut
+- **Desktop entry search** — indexes `.desktop` files from standard XDG locations
+- **Multi-monitor aware** — targets the display your cursor is currently on
+- **System tray** — optional tray icon for quick access
+- **Fully configurable** — theme, layout, and keyboard shortcuts are all customizable via a TOML config file
+
+## How it works
+
+Gamut runs a persistent daemon process in the background. When you want to launch an app, you send a
+`toggle` command (via CLI, keyboard shortcut, or tray icon). The daemon opens the launcher window on
+your active monitor. Type to search, navigate with the arrow keys, and press Enter to launch.
+
+When the launcher is closed — by pressing Escape, launching an app, or losing focus — the daemon
+keeps running so the next toggle is instant.
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="Getting Started" href="./getting-started" description="Install gamut and run it for the first time" />
+  <Card title="CLI Reference" href="./cli" description="All available command-line flags" />
+  <Card title="Configuration" href="./configuration" description="Customize theme, layout, and shortcuts" />
 </Cards>

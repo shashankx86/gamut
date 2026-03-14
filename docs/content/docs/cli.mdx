@@ -1,0 +1,74 @@
+---
+title: CLI Reference
+description: All command-line flags and modes available in the gamut binary.
+---
+
+The `gamut` binary is both the daemon and the client. All interaction happens by running it with
+different flags.
+
+## Synopsis
+
+```
+gamut [OPTIONS]
+```
+
+## Options
+
+| Flag | Description |
+|---|---|
+| `--toggle` | Toggle the launcher open/closed (default) |
+| `--daemon` | Start the background daemon process |
+| `--preferences` | Open the graphical preferences window |
+| `--quit` | Ask the running daemon to exit |
+| `-v`, `--version` | Print the version and exit |
+| `-h`, `--help` | Print help text and exit |
+
+## Modes
+
+### `--toggle` (default)
+
+Sends a toggle command to the running daemon. If the launcher is currently hidden, it opens it on
+the active monitor. If it is open, it closes it.
+
+If no daemon is running, Gamut will start one automatically and then send the toggle command.
+
+```sh
+gamut
+# same as
+gamut --toggle
+```
+
+### `--daemon`
+
+Starts the background daemon. The daemon:
+
+- Indexes installed desktop applications
+- Listens for IPC commands (toggle, quit)
+- Manages the system tray icon
+- Handles launcher window lifecycle
+
+Run this once per session (or use [autostart](./getting-started#autostart)):
+
+```sh
+gamut --daemon
+```
+
+Only one daemon instance runs at a time. Starting a second instance exits immediately.
+
+### `--preferences`
+
+Opens the graphical preferences window. From there you can configure appearance, layout, and
+keyboard shortcuts. All changes are saved immediately.
+
+```sh
+gamut --preferences
+```
+
+### `--quit`
+
+Sends a quit signal to the running daemon. The daemon will finish any in-flight work and exit
+cleanly.
+
+```sh
+gamut --quit
+```

@@ -1,0 +1,77 @@
+---
+title: Getting Started
+description: Install Gamut and run it for the first time on your Linux desktop.
+---
+
+## Requirements
+
+- Linux (Wayland)
+- A desktop environment that respects XDG standards
+
+## Installation
+
+### From source
+
+You will need the [Rust toolchain](https://rustup.rs) installed.
+
+```sh
+git clone https://github.com/eopkg/gamut
+cd gamut
+cargo build --release
+```
+
+The compiled binary will be at `target/release/gamut`. Copy it somewhere on your `$PATH`:
+
+```sh
+sudo install -Dm755 target/release/gamut /usr/local/bin/gamut
+```
+
+## First run
+
+Start the background daemon:
+
+```sh
+gamut --daemon
+```
+
+With the daemon running, toggle the launcher open:
+
+```sh
+gamut --toggle
+```
+
+The launcher window will appear on your active monitor. Type to search for an application, use
+`ArrowDown` / `ArrowUp` to move through results, and press `Enter` to launch.
+
+Press `Escape` to close the launcher. The daemon stays running so the next toggle is instant.
+
+## Autostart
+
+To have the daemon start automatically with your desktop session, enable the **Start at login**
+option in the [Preferences window](#preferences-window), or set it in your config file:
+
+```toml title="~/.config/gamut/preferences.toml"
+[system]
+start_at_login = true
+```
+
+On most desktops this works by writing a `.desktop` autostart entry to
+`~/.config/autostart/gamut.desktop`.
+
+## Preferences window
+
+Open the graphical preferences window to adjust the theme, layout, and shortcuts:
+
+```sh
+gamut --preferences
+```
+
+Changes are saved immediately to `~/.config/gamut/preferences.toml`.
+
+## Stopping the daemon
+
+```sh
+gamut --quit
+```
+
+This sends a quit signal to the running daemon and exits cleanly.

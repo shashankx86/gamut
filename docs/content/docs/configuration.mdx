@@ -1,0 +1,185 @@
+---
+title: Configuration
+description: Customize Gamut's appearance, layout, and keyboard shortcuts via the TOML config file.
+---
+
+Gamut stores all settings in a single TOML file:
+
+```
+~/.config/gamut/preferences.toml
+```
+
+The file is created with defaults on first run. You can edit it by hand or use the
+[preferences window](./getting-started#preferences-window) (`gamut --preferences`).
+
+Below is a full annotated example with every available option and its default value.
+
+```toml title="~/.config/gamut/preferences.toml"
+[appearance]
+# Color scheme to use: "system" | "light" | "dark"
+# "system" follows the desktop's light/dark preference.
+theme = "system"
+
+# Corner radius preset: "small" | "medium" | "large" | "custom"
+radius = "small"
+
+# Radius in pixels when radius = "custom"
+custom_radius = 10.0
+
+# Light color scheme colors (hex, 6 or 8 digits)
+[appearance.schemes.light]
+background = "#F3F4F6"
+text       = "#1F2328"
+accent     = "#416EF5"
+
+# Dark color scheme colors
+[appearance.schemes.dark]
+background = "#151516"
+text       = "#EBEDF2"
+accent     = "#5E8BFF"
+
+[layout]
+# Launcher size preset: "small" | "medium" | "large" | "extra_large"
+size = "medium"
+
+# Launcher placement: "center" | "raised_center" | "custom"
+placement = "raised_center"
+
+# Distance from the top of the screen in pixels when placement = "custom"
+custom_top_margin = 120.0
+
+[shortcuts]
+# Key binding to launch the selected item
+launch_selected     = { ctrl = false, alt = false, shift = false, super_key = false, key = "Enter" }
+
+# Key binding to expand a result or move the selection down
+expand_or_move_down = { ctrl = false, alt = false, shift = false, super_key = false, key = "ArrowDown" }
+
+# Key binding to move the selection up
+move_up             = { ctrl = false, alt = false, shift = false, super_key = false, key = "ArrowUp" }
+
+# Key binding to close the launcher
+close_launcher      = { ctrl = false, alt = false, shift = false, super_key = false, key = "Escape" }
+
+[system]
+# Launch the daemon automatically when the desktop session starts
+start_at_login = false
+```
+
+---
+
+## Appearance
+
+### `theme`
+
+Controls which color scheme is active.
+
+| Value | Description |
+|---|---|
+| `"system"` | Follow the desktop light/dark mode (default) |
+| `"light"` | Always use the light scheme |
+| `"dark"` | Always use the dark scheme |
+
+### `radius`
+
+Corner radius of the launcher window.
+
+| Value | Description |
+|---|---|
+| `"small"` | Subtle rounding (default) |
+| `"medium"` | Moderate rounding |
+| `"large"` | Heavy rounding |
+| `"custom"` | Use the `custom_radius` value |
+
+### `schemes.light` / `schemes.dark`
+
+Each scheme defines three hex colors:
+
+| Field | Description |
+|---|---|
+| `background` | Window background color |
+| `text` | Primary text color |
+| `accent` | Accent / highlight color |
+
+Colors must be 6-digit (`#RRGGBB`) or 8-digit (`#RRGGBBAA`) hex strings.
+
+---
+
+## Layout
+
+### `size`
+
+Controls the overall size of the launcher window.
+
+| Value | Description |
+|---|---|
+| `"small"` | Compact |
+| `"medium"` | Default |
+| `"large"` | Spacious |
+| `"extra_large"` | Maximum |
+
+### `placement`
+
+Where the launcher appears on the screen.
+
+| Value | Description |
+|---|---|
+| `"center"` | Exact vertical center of the screen |
+| `"raised_center"` | Slightly above center (default) |
+| `"custom"` | Use `custom_top_margin` to set the top offset |
+
+### `custom_top_margin`
+
+Distance in pixels from the top of the screen when `placement = "custom"`. Defaults to `120.0`.
+
+---
+
+## Shortcuts
+
+Each shortcut is a table with modifier booleans and a `key` string.
+
+```toml
+[shortcuts]
+launch_selected = { ctrl = false, alt = false, shift = false, super_key = false, key = "Enter" }
+```
+
+### Available modifier fields
+
+| Field | Modifier key |
+|---|---|
+| `ctrl` | Ctrl / Control |
+| `alt` | Alt |
+| `shift` | Shift |
+| `super_key` | Super / Meta / Win / Cmd |
+
+### `key` format
+
+Use the standard key name. Common values:
+
+- Named keys: `Enter`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Space`
+- Single characters: `a`, `b`, `1`, `/`, etc.
+
+Key names are matched case-insensitively.
+
+### Configurable actions
+
+| Setting | Default | Description |
+|---|---|---|
+| `launch_selected` | `Enter` | Launch the focused application |
+| `expand_or_move_down` | `ArrowDown` | Move selection down |
+| `move_up` | `ArrowUp` | Move selection up |
+| `close_launcher` | `Escape` | Close the launcher |
+
+---
+
+## System
+
+### `start_at_login`
+
+When `true`, Gamut writes an autostart `.desktop` entry to `~/.config/autostart/gamut.desktop` so
+the daemon is started automatically when your desktop session begins.
+
+```toml
+[system]
+start_at_login = true
+```
