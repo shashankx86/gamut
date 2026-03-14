@@ -38,6 +38,7 @@ impl Launcher {
                     Task::none()
                 }
             }
+            Message::ExpandResults => self.expand_results(),
             Message::LaunchIndex(index) => self.launch(index),
             Message::AppCommand(command) => self.handle_app_command(command),
             Message::IpcCommand(command) => self.handle_ipc_command(command),
@@ -73,11 +74,11 @@ impl Launcher {
     fn handle_app_command(&mut self, command: AppCommand) -> Task<Message> {
         match command {
             AppCommand::ShowLauncher { target_output } => {
-                self.target_output_name = target_output;
+                self.target_output = target_output;
                 self.show_launcher()
             }
             AppCommand::ToggleLauncher { target_output } => {
-                self.target_output_name = target_output;
+                self.target_output = target_output;
                 if self.is_visible {
                     self.hide_launcher()
                 } else {

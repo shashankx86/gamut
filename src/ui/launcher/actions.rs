@@ -8,6 +8,15 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 impl Launcher {
+    pub(super) fn expand_results(&mut self) -> Task<Message> {
+        if self.normalized_query.is_empty() && self.results_target == 0.0 {
+            self.results_target = 1.0;
+            self.manually_expanded = true;
+        }
+
+        Task::none()
+    }
+
     pub(super) fn launch(&mut self, index: usize) -> Task<Message> {
         let Some(app) = self.apps.get(index) else {
             return Task::none();
@@ -63,7 +72,9 @@ impl Launcher {
                 launcher_visible_surface_settings(
                     &self.layout,
                     self.results_progress > 0.0 || self.results_target > 0.0,
-                    self.target_output_name.as_deref(),
+                    self.target_output
+                        .as_ref()
+                        .map(|target| target.name.as_str()),
                 )
             } else {
                 launcher_visible_surface_settings(&self.layout, false, None)

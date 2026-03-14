@@ -11,6 +11,7 @@ use super::layout::{LauncherLayout, LauncherPreferences};
 use super::theme::{ResolvedAppearance, resolve_appearance, resolve_asset_theme, resolve_theme};
 use crate::core::app_command::AppCommand;
 use crate::core::assets::launcher_logo_svg;
+use crate::core::display::OutputTarget;
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_cached_app_catalog, refresh_app_cache,
     resolve_icon_requests, save_cached_apps,
@@ -110,7 +111,7 @@ pub(super) struct Launcher {
     pub(super) results_scroll_id: widget::Id,
     pub(super) launcher_window_id: Option<window::Id>,
     pub(super) monitor_size: Option<Size>,
-    pub(super) target_output_name: Option<String>,
+    pub(super) target_output: Option<OutputTarget>,
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,
@@ -153,6 +154,7 @@ pub(super) enum Message {
     IconsResolved(Vec<(usize, Option<PathBuf>)>),
     QueryChanged(String),
     LaunchFirstMatch,
+    ExpandResults,
     LaunchIndex(usize),
     AppCommand(AppCommand),
     IpcCommand(IpcCommand),
@@ -210,7 +212,7 @@ impl Launcher {
             results_scroll_id,
             launcher_window_id: None,
             monitor_size: None,
-            target_output_name: None,
+            target_output: None,
             is_visible: false,
             ignore_unfocus_until: None,
             selected_rank: 0,

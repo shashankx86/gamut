@@ -108,9 +108,7 @@ impl Launcher {
             physical_key,
         ) {
             if self.normalized_query.is_empty() && self.results_target == 0.0 {
-                self.results_target = 1.0;
-                self.manually_expanded = true;
-                return Task::none();
+                return self.expand_results();
             }
 
             let previous_rank = self.selected_rank;

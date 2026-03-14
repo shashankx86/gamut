@@ -15,6 +15,12 @@ use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 const BOTTOM_STRIP_ICON_BUTTON_SIZE: f32 = 20.0;
 const BOTTOM_STRIP_ICON_SIZE: f32 = 12.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BottomStripAction {
+    Expand,
+    Launch,
+}
+
 impl Launcher {
     pub(super) fn view(&self, window: window::Id) -> Element<'_, Message> {
         let _ = window;
@@ -214,6 +220,7 @@ impl Launcher {
                 action_icon_button(
                     icon_chevron_down().size(BOTTOM_STRIP_ICON_SIZE),
                     &shadcn_theme,
+                    BottomStripAction::Expand,
                 ),
             )
         } else {
@@ -222,6 +229,7 @@ impl Launcher {
                 action_icon_button(
                     icon_corner_down_left().size(BOTTOM_STRIP_ICON_SIZE),
                     &shadcn_theme,
+                    BottomStripAction::Launch,
                 ),
             )
         };
@@ -359,10 +367,14 @@ fn bottom_strip_shadcn_theme(appearance: &super::theme::ResolvedAppearance) -> S
 fn action_icon_button<'a>(
     icon: impl Into<Element<'a, Message>>,
     theme: &ShadcnTheme,
+    action: BottomStripAction,
 ) -> iced::widget::button::Button<'a, Message> {
     icon_button(
         icon,
-        Some(Message::LaunchFirstMatch),
+        Some(match action {
+            BottomStripAction::Expand => Message::ExpandResults,
+            BottomStripAction::Launch => Message::LaunchFirstMatch,
+        }),
         ButtonProps::new()
             .variant(ButtonVariant::Outline)
             .radius(ButtonRadius::Small)

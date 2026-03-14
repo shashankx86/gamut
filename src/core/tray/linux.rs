@@ -2,6 +2,7 @@ use super::icon;
 use super::{TrayController, TrayService};
 use crate::core::app_command::AppCommand;
 use crate::core::assets::asset_theme;
+use crate::core::display::active_output_target;
 use crate::core::preferences::AppPreferences;
 use gtk::glib;
 use gtk::prelude::*;
@@ -186,7 +187,7 @@ fn handle_menu_event(event: MenuEvent, command_tx: &Sender<AppCommand>) {
 
 fn show_command() -> AppCommand {
     AppCommand::ShowLauncher {
-        target_output: None,
+        target_output: active_output_target(),
     }
 }
 
@@ -196,13 +197,8 @@ mod tests {
     use crate::core::app_command::AppCommand;
 
     #[test]
-    fn tray_show_command_avoids_target_output_lookup() {
-        assert_eq!(
-            show_command(),
-            AppCommand::ShowLauncher {
-                target_output: None,
-            }
-        );
+    fn tray_show_command_keeps_show_launcher_variant() {
+        assert!(matches!(show_command(), AppCommand::ShowLauncher { .. }));
     }
 }
 
