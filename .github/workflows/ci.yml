@@ -28,6 +28,8 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 jobs:
   test:
@@ -269,13 +271,147 @@ jobs:
         run: |
           sed -i 's/^version = "[^"]*"/version = "${{ needs.prepare.outputs.version }}"/' Cargo.toml
           cargo update --workspace
-      - name: Extract changelog
+      - name: Checkout default branch for changelog commit
         if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
-        uses: michaelklishin/rust-build-package-release-action@v1
+        run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' || true)
+          fi
+          if [ -z "$DEFAULT_BRANCH" ]; then
+            DEFAULT_BRANCH="main"
+          fi
+          git checkout "$DEFAULT_BRANCH"
+          git pull --ff-only origin "$DEFAULT_BRANCH"
+      - name: Set up Ruby for changelog generation
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        uses: ruby/setup-ruby@v1
         with:
-          command: extract-changelog
-          version: ${{ needs.prepare.outputs.version }}
-        continue-on-error: true
+          ruby-version: '3.2'
+      - name: Install github-changelog-generator
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        run: gem install github_changelog_generator
+      - name: Generate changelog
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        env:
+          CHANGELOG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          REPO="${GITHUB_REPOSITORY##*/}"
+          TAG="${{ needs.prepare.outputs.tag }}"
+          PREV_TAG=$(git tag --list 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+          EXTRA_ARGS=""
+          if [ -n "$PREV_TAG" ]; then
+            EXTRA_ARGS="--since-tag $PREV_TAG"
+          fi
+          github_changelog_generator \
+            --user "$OWNER" \
+            --project "$REPO" \
+            --token "$CHANGELOG_GITHUB_TOKEN" \
+            --future-release "$TAG" \
+            $EXTRA_ARGS \
+            --output CHANGELOG.md
+      - name: Build release notes from git log
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          PREV_TAG=$(git tag --list 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+          BUILT_FROM="${{ needs.prepare.outputs.commit }}"
+          if [ -z "$BUILT_FROM" ]; then
+            BUILT_FROM="$(git rev-parse HEAD)"
+          fi
+          END_REF="$BUILT_FROM"
+          if [ -n "$PREV_TAG" ] && git rev-parse -q --verify "refs/tags/$PREV_TAG" >/dev/null; then
+            RANGE="refs/tags/$PREV_TAG..$END_REF"
+          else
+            RANGE="$END_REF"
+          fi
+          CHANGELOG_URL=""
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${TAG}"
+          else
+            CHANGELOG_URL="https://github.com/${GITHUB_REPOSITORY}/commits/${END_REF}"
+          fi
+          VERSION="${{ needs.prepare.outputs.version }}"
+          {
+            echo "Full Changelog: ${CHANGELOG_URL}"
+            echo ""
+            echo "#### Changelog:"
+            git log --no-merges --pretty="* %s (%h)" $RANGE
+            echo ""
+            echo "Built from ${BUILT_FROM}."
+            if [[ "$VERSION" == 0.* ]]; then
+              echo ""
+              echo "#### Notes"
+              echo "- This is an early, v0.x release: interfaces and behavior may change as the launcher evolves."
+            fi
+          } > release_notes.md
+      - name: Update changelog section from git log
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          PREV_TAG=$(git tag --list 'v*' --sort=-version:refname | grep -v "^${TAG}$" | head -1)
+          END_REF="${GITHUB_SHA}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            END_REF="refs/tags/$TAG"
+          fi
+          if [ -n "$PREV_TAG" ] && git rev-parse -q --verify "refs/tags/$PREV_TAG" >/dev/null; then
+            RANGE="refs/tags/$PREV_TAG..$END_REF"
+          else
+            RANGE="$END_REF"
+          fi
+          SECTION_FILE="$(mktemp)"
+          {
+            echo "## [$TAG] - $(date -u +%Y-%m-%d)"
+            git log --no-merges --pretty="* %s (%h)" $RANGE
+          } > "$SECTION_FILE"
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="[$TAG]" -v section_file="$SECTION_FILE" '
+              function print_section() {
+                while ((getline line < section_file) > 0) print line
+                close(section_file)
+              }
+              $0 ~ /^## / && $0 ~ tag {
+                found=1
+                in_section=1
+                print_section()
+                next
+              }
+              $0 ~ /^## / && in_section { in_section=0 }
+              !in_section { print }
+              END {
+                if (!found) {
+                  print ""
+                  print_section()
+                }
+              }
+            ' CHANGELOG.md > CHANGELOG.new
+            mv CHANGELOG.new CHANGELOG.md
+          else
+            cp "$SECTION_FILE" CHANGELOG.md
+          fi
+          rm -f "$SECTION_FILE"
+      - name: Commit changelog
+        if: ${{ needs.prepare.outputs.is_push_main != 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git status --porcelain CHANGELOG.md | grep -q .; then
+            DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+            if [ -z "$DEFAULT_BRANCH" ]; then
+              DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@' || true)
+            fi
+            if [ -z "$DEFAULT_BRANCH" ]; then
+              DEFAULT_BRANCH="main"
+            fi
+            git add CHANGELOG.md
+            git -c user.name="github-actions[bot]" \
+                -c user.email="github-actions[bot]@users.noreply.github.com" \
+                commit -m "Update CHANGELOG for ${{ needs.prepare.outputs.tag }}"
+            git push origin HEAD:"$DEFAULT_BRANCH"
+          else
+            echo "No CHANGELOG.md changes to commit."
+          fi
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
