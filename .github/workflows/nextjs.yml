@@ -1,0 +1,72 @@
+# Sample workflow for building and deploying a Next.js site to GitHub Pages using Bun
+name: Deploy Next.js site to Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Tell the runner to execute commands inside the docs/ folder by default
+    defaults:
+      run:
+        working-directory: ./docs
+        
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24" # Updated to 24 to fix the future deprecation warning
+          
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          static_site_generator: next
+          
+      - name: Restore Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: docs/.next/cache
+          # Updated to track Bun's lockfiles for caching
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/bun.lock', 'docs/**/bun.lockb') }}-${{ hashFiles('docs/**.[jt]s', 'docs/**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/bun.lock', 'docs/**/bun.lockb') }}-
+            
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build with Next.js
+        run: bun run build
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
