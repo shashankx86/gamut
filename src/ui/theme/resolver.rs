@@ -1,9 +1,9 @@
 use super::color_scheme::shared_color_scheme;
 use super::palette::{ResolvedAppearance, ThemePalette};
-use crate::core::assets::{asset_theme, AssetTheme};
+use crate::core::assets::{AssetTheme, asset_theme};
 use crate::core::preferences::{AppearancePreferences, ThemePreference};
-use iced::theme::Palette;
 use iced::Theme;
+use iced::theme::Palette;
 
 pub(crate) fn resolve_theme(preferences: &AppearancePreferences) -> Theme {
     let resolved = resolve_palette(preferences);

@@ -1,25 +1,25 @@
 ---
 title: CLI Reference
-description: All command-line flags and modes available in the gamut binary.
+description: All command-line commands, subcommands, and modes available in the gamut binary.
 ---
 
 The `gamut` binary is both the daemon and the client. All interaction happens by running it with
-different flags.
+different commands.
 
 ## Synopsis
 
 ```
-gamut [OPTIONS]
+gamut [OPTIONS] [COMMAND]
 ```
 
-## Options
+## Top-level commands
 
-| Flag | Description |
+| Command | Description |
 |---|---|
-| `--toggle` | Toggle the launcher open/closed (default) |
-| `--daemon` | Start the background daemon process |
-| `--preferences` | Open the graphical preferences window |
-| `--quit` | Ask the running daemon to exit |
+| `toggle` or `--toggle` | Toggle the launcher open/closed (default) |
+| `daemon` or `--daemon` | Start the background daemon process |
+| `quit` or `--quit` | Ask the running daemon to exit |
+| `config` | Manage appearance, layout, system options, and shortcuts |
 | `-v`, `--version` | Print the version and exit |
 | `-h`, `--help` | Print help text and exit |
 
@@ -55,13 +55,24 @@ gamut --daemon
 
 Only one daemon instance runs at a time. Starting a second instance exits immediately.
 
-### `--preferences`
+### `config`
 
-Opens the graphical preferences window. From there you can configure appearance, layout, and
-keyboard shortcuts. All changes are saved immediately.
+Config is now fully CLI-based. Use it to inspect settings, update individual values, reset values,
+and manage shortcuts either directly or through a guided interactive prompt.
 
 ```sh
-gamut --preferences
+gamut config show
+gamut config set appearance.theme dark
+gamut config set layout.size large
+gamut config shortcut set move-up Ctrl+K
+gamut config shortcut interactive
+```
+
+Helpful nested help:
+
+```sh
+gamut help config
+gamut help config shortcut
 ```
 
 ### `--quit`

@@ -1,6 +1,6 @@
 use super::Launcher;
-use crate::core::desktop::{normalize_query, DesktopApp};
-use crate::core::search::{rank_applications, ApplicationSearchResponse};
+use crate::core::desktop::{DesktopApp, normalize_query};
+use crate::core::search::{ApplicationSearchResponse, rank_applications};
 use log::error;
 
 impl Launcher {

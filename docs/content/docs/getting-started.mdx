@@ -48,25 +48,31 @@ Press `Escape` to close the launcher. The daemon stays running so the next toggl
 ## Autostart
 
 To have the daemon start automatically with your desktop session, enable the **Start at login**
-option in the [Preferences window](#preferences-window), or set it in your config file:
+setting with the config CLI, or set it in your config file:
 
-```toml title="~/.config/gamut/preferences.toml"
+```toml title="~/.config/gamut/config.toml"
 [system]
 start_at_login = true
+```
+
+```sh
+gamut config set system.start_at_login true
 ```
 
 On most desktops this works by writing a `.desktop` autostart entry to
 `~/.config/autostart/gamut.desktop`.
 
-## Preferences window
+## Configuration
 
-Open the graphical preferences window to adjust the theme, layout, and shortcuts:
+Use the config CLI to inspect and adjust theme, layout, and shortcuts:
 
 ```sh
-gamut --preferences
+gamut config show
+gamut config set appearance.theme dark
+gamut config shortcut interactive
 ```
 
-Changes are saved immediately to `~/.config/gamut/preferences.toml`.
+Changes are saved immediately to `~/.config/gamut/config.toml`.
 
 ## Stopping the daemon
 

@@ -1,8 +1,7 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use crate::core::preferences::launch_preferences_app;
-use iced::{window, Task};
+use iced::{Task, window};
 use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -83,14 +82,6 @@ impl Launcher {
         }));
 
         Task::batch(tasks)
-    }
-
-    pub(super) fn open_preferences_window(&mut self) -> Task<Message> {
-        if let Err(error) = launch_preferences_app() {
-            error!("failed to open preferences window: {error}");
-        }
-
-        Task::none()
     }
 
     pub(super) fn should_ignore_unfocus(&self) -> bool {

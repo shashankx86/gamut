@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -10,12 +12,12 @@ pub enum RadiusPreference {
 }
 
 impl RadiusPreference {
-    pub const fn label(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Small => "Small",
-            Self::Medium => "Medium",
-            Self::Large => "Large",
-            Self::Custom => "Custom",
+            Self::Small => "small",
+            Self::Medium => "medium",
+            Self::Large => "large",
+            Self::Custom => "custom",
         }
     }
 }
@@ -23,6 +25,26 @@ impl RadiusPreference {
 impl Default for RadiusPreference {
     fn default() -> Self {
         Self::Small
+    }
+}
+
+impl fmt::Display for RadiusPreference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for RadiusPreference {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "small" => Ok(Self::Small),
+            "medium" => Ok(Self::Medium),
+            "large" => Ok(Self::Large),
+            "custom" => Ok(Self::Custom),
+            _ => Err("expected one of: small, medium, large, custom".to_string()),
+        }
     }
 }
 
@@ -53,14 +75,12 @@ pub enum LauncherSize {
 }
 
 impl LauncherSize {
-    pub const ALL: [Self; 4] = [Self::Small, Self::Medium, Self::Large, Self::ExtraLarge];
-
-    pub const fn label(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Small => "Small",
-            Self::Medium => "Medium",
-            Self::Large => "Large",
-            Self::ExtraLarge => "Extra large",
+            Self::Small => "small",
+            Self::Medium => "medium",
+            Self::Large => "large",
+            Self::ExtraLarge => "extra_large",
         }
     }
 }
@@ -68,6 +88,26 @@ impl LauncherSize {
 impl Default for LauncherSize {
     fn default() -> Self {
         Self::Medium
+    }
+}
+
+impl fmt::Display for LauncherSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for LauncherSize {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "small" => Ok(Self::Small),
+            "medium" => Ok(Self::Medium),
+            "large" => Ok(Self::Large),
+            "extra_large" | "extralarge" | "extra-large" => Ok(Self::ExtraLarge),
+            _ => Err("expected one of: small, medium, large, extra_large".to_string()),
+        }
     }
 }
 
@@ -79,10 +119,37 @@ pub enum LauncherPlacement {
     Custom,
 }
 
-impl LauncherPlacement {}
+impl LauncherPlacement {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Center => "center",
+            Self::RaisedCenter => "raised_center",
+            Self::Custom => "custom",
+        }
+    }
+}
 
 impl Default for LauncherPlacement {
     fn default() -> Self {
         Self::RaisedCenter
+    }
+}
+
+impl fmt::Display for LauncherPlacement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for LauncherPlacement {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "center" => Ok(Self::Center),
+            "raised_center" | "raisedcenter" | "raised-center" => Ok(Self::RaisedCenter),
+            "custom" => Ok(Self::Custom),
+            _ => Err("expected one of: center, raised_center, custom".to_string()),
+        }
     }
 }

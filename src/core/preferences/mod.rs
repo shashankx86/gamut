@@ -1,11 +1,14 @@
+mod config;
 mod model;
-mod process;
 mod store;
 
+pub(crate) use config::{
+    ConfigCommand, ConfigKey, ConfigResetTarget, ShortcutConfigCommand, execute as run_config,
+};
 pub(crate) use model::normalize_hex_color;
 pub(crate) use model::{
     AppPreferences, AppearancePreferences, LauncherPlacement, LauncherSize, RadiusPreference,
-    ShortcutBinding, ShortcutPreferences, ThemeColors, ThemePreference, ThemeSchemeId,
+    ShortcutAction, ShortcutBinding, ShortcutPreferences, ThemeColors, ThemePreference,
+    ThemeSchemeId,
 };
-pub(crate) use process::launch_preferences_app;
-pub(crate) use store::{load_preferences, save_preferences};
+pub(crate) use store::{config_path, load_preferences, save_preferences};

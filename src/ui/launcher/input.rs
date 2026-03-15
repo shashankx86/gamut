@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
-use iced::keyboard::{self, key::Named, Key, Modifiers};
+use iced::keyboard::{self, Key, Modifiers, key::Named};
 use iced::widget::{operation, scrollable};
-use iced::{window, Task};
+use iced::{Task, window};
 
 impl Launcher {
     pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {

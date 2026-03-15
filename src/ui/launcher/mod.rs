@@ -11,15 +11,15 @@ use super::layout::{LauncherLayout, LauncherPreferences};
 use super::theme::{ResolvedAppearance, resolve_appearance, resolve_asset_theme, resolve_theme};
 use crate::core::app_command::AppCommand;
 use crate::core::assets::launcher_logo_svg;
-use crate::core::display::OutputTarget;
 use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_cached_app_catalog, refresh_app_cache,
     resolve_icon_requests, save_cached_apps,
 };
+use crate::core::display::OutputTarget;
 use crate::core::ipc::{IpcCommand, start_listener};
 use crate::core::preferences::{AppPreferences, load_preferences};
-use crate::core::tray::TrayController;
 use crate::core::search::{ApplicationSearchEngine, ApplicationSearchResponse};
+use crate::core::tray::TrayController;
 use iced::Size;
 use iced::keyboard::Modifiers;
 use iced::widget::svg::Handle as SvgHandle;

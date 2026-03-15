@@ -2,7 +2,6 @@
 pub enum IpcCommand {
     Show { target_output: Option<String> },
     Toggle { target_output: Option<String> },
-    OpenPreferences,
     ReloadPreferences,
     Quit,
     Ping,
@@ -13,7 +12,6 @@ impl IpcCommand {
         match self {
             Self::Show { target_output } => serialize_command("show", target_output.as_deref()),
             Self::Toggle { target_output } => serialize_command("toggle", target_output.as_deref()),
-            Self::OpenPreferences => "open-preferences\n".to_string(),
             Self::ReloadPreferences => "reload-preferences\n".to_string(),
             Self::Quit => "quit\n".to_string(),
             Self::Ping => "ping\n".to_string(),
@@ -33,7 +31,6 @@ impl IpcCommand {
         match command {
             "show" => Some(Self::Show { target_output }),
             "toggle" => Some(Self::Toggle { target_output }),
-            "open-preferences" => Some(Self::OpenPreferences),
             "reload-preferences" => Some(Self::ReloadPreferences),
             "quit" => Some(Self::Quit),
             "ping" => Some(Self::Ping),
@@ -74,10 +71,6 @@ mod tests {
             })
         );
         assert_eq!(
-            IpcCommand::from_wire("open-preferences"),
-            Some(IpcCommand::OpenPreferences),
-        );
-        assert_eq!(
             IpcCommand::from_wire("reload-preferences"),
             Some(IpcCommand::ReloadPreferences),
         );
@@ -109,7 +102,6 @@ mod tests {
             .as_wire(),
             "toggle\tDP-1\n"
         );
-        assert_eq!(IpcCommand::OpenPreferences.as_wire(), "open-preferences\n",);
         assert_eq!(
             IpcCommand::ReloadPreferences.as_wire(),
             "reload-preferences\n",

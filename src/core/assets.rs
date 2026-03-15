@@ -57,7 +57,7 @@ pub(crate) const fn tray_icon_svg(theme: AssetTheme) -> &'static [u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{asset_theme_for_mode, launcher_logo_svg, tray_icon_svg, AssetTheme};
+    use super::{AssetTheme, asset_theme_for_mode, launcher_logo_svg, tray_icon_svg};
     use crate::core::preferences::{AppearancePreferences, ThemePreference};
     use dark_light::Mode as SystemThemeMode;
 

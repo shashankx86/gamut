@@ -1,20 +1,19 @@
 ---
 title: Configuration
-description: Customize Gamut's appearance, layout, and keyboard shortcuts via the TOML config file.
+description: Customize Gamut's appearance, layout, and keyboard shortcuts via the TOML config file or the config CLI.
 ---
 
 Gamut stores all settings in a single TOML file:
 
 ```
-~/.config/gamut/preferences.toml
+~/.config/gamut/config.toml
 ```
 
-The file is created with defaults on first run. You can edit it by hand or use the
-[preferences window](./getting-started#preferences-window) (`gamut --preferences`).
+The file is created with defaults on first run. You can edit it by hand or use the config CLI.
 
 Below is a full annotated example with every available option and its default value.
 
-```toml title="~/.config/gamut/preferences.toml"
+```toml title="~/.config/gamut/config.toml"
 [appearance]
 # Color scheme to use: "system" | "light" | "dark"
 # "system" follows the desktop's light/dark preference.
@@ -64,6 +63,17 @@ close_launcher      = { ctrl = false, alt = false, shift = false, super_key = fa
 [system]
 # Launch the daemon automatically when the desktop session starts
 start_at_login = false
+```
+
+Common CLI workflows:
+
+```sh
+gamut config show
+gamut config get appearance.theme
+gamut config set layout.placement custom
+gamut config set layout.custom_top_margin 96
+gamut config shortcut set close-launcher Ctrl+Q
+gamut config shortcut interactive
 ```
 
 ---

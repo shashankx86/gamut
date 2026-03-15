@@ -3,6 +3,8 @@ use dark_light::Mode as SystemThemeMode;
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AppearancePreferences {
@@ -114,13 +116,11 @@ pub enum ThemePreference {
 }
 
 impl ThemePreference {
-    pub const ALL: [Self; 3] = [Self::System, Self::Light, Self::Dark];
-
-    pub const fn label(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::System => "System",
-            Self::Light => "Light",
-            Self::Dark => "Dark",
+            Self::System => "system",
+            Self::Light => "light",
+            Self::Dark => "dark",
         }
     }
 }
@@ -136,11 +136,26 @@ impl Serialize for ThemePreference {
     where
         S: Serializer,
     {
-        serializer.serialize_str(match self {
-            Self::Light => "light",
-            Self::Dark => "dark",
-            Self::System => "system",
-        })
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl fmt::Display for ThemePreference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for ThemePreference {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "light" => Ok(Self::Light),
+            "dark" | "custom" => Ok(Self::Dark),
+            "system" => Ok(Self::System),
+            _ => Err("expected one of: system, light, dark".to_string()),
+        }
     }
 }
 
@@ -151,15 +166,8 @@ impl<'de> Deserialize<'de> for ThemePreference {
     {
         let value = String::deserialize(deserializer)?;
 
-        match value.as_str() {
-            "light" => Ok(Self::Light),
-            "dark" | "custom" => Ok(Self::Dark),
-            "system" => Ok(Self::System),
-            _ => Err(de::Error::unknown_variant(
-                &value,
-                &["light", "dark", "system", "custom"],
-            )),
-        }
+        Self::from_str(&value)
+            .map_err(|_| de::Error::unknown_variant(&value, &["light", "dark", "system", "custom"]))
     }
 }
 
@@ -171,13 +179,17 @@ pub enum ThemeSchemeId {
 }
 
 impl ThemeSchemeId {
-    pub const ALL: [Self; 2] = [Self::Light, Self::Dark];
-
-    pub const fn label(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Light => "Light",
-            Self::Dark => "Dark",
+            Self::Light => "light",
+            Self::Dark => "dark",
         }
+    }
+}
+
+impl fmt::Display for ThemeSchemeId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -254,7 +266,7 @@ use super::RadiusPreference;
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
+        AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
     };
 
     #[test]

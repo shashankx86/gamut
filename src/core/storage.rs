@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn app_paths_use_expected_directories() {
-        assert!(app_config_path("preferences.toml").ends_with("gamut/preferences.toml"));
+        assert!(app_config_path("config.toml").ends_with("gamut/config.toml"));
         assert!(app_cache_path("applications.bin").ends_with("gamut/applications.bin"));
     }
 

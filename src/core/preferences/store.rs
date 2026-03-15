@@ -5,20 +5,26 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-const PREFERENCES_FILE: &str = "preferences.toml";
+const CONFIG_FILE: &str = "config.toml";
+const LEGACY_CONFIG_FILE: &str = "preferences.toml";
 
 pub fn load_preferences() -> AppPreferences {
-    let path = preferences_path();
-    load_preferences_from_path(&path).unwrap_or_default()
+    load_preferences_from_path(&config_path())
+        .or_else(|_| load_preferences_from_path(&legacy_config_path()))
+        .unwrap_or_default()
 }
 
 pub fn save_preferences(preferences: &AppPreferences) -> io::Result<()> {
-    let path = preferences_path();
+    let path = config_path();
     save_preferences_to_path(preferences, &path)
 }
 
-pub fn preferences_path() -> PathBuf {
-    app_config_path(PREFERENCES_FILE)
+pub fn config_path() -> PathBuf {
+    app_config_path(CONFIG_FILE)
+}
+
+fn legacy_config_path() -> PathBuf {
+    app_config_path(LEGACY_CONFIG_FILE)
 }
 
 fn load_preferences_from_path(path: &Path) -> io::Result<AppPreferences> {
@@ -34,7 +40,7 @@ fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Re
 #[cfg(test)]
 mod tests {
     use super::{
-        load_preferences_from_path, preferences_path, save_preferences_to_path, AppPreferences,
+        AppPreferences, config_path, load_preferences_from_path, save_preferences_to_path,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -47,12 +53,12 @@ mod tests {
             .as_nanos();
         PathBuf::from("/tmp")
             .join(format!("gamut-preferences-test-{nanos}"))
-            .join("preferences.toml")
+            .join("config.toml")
     }
 
     #[test]
-    fn preferences_path_uses_expected_filename() {
-        assert!(preferences_path().ends_with("gamut/preferences.toml"));
+    fn config_path_uses_expected_filename() {
+        assert!(config_path().ends_with("gamut/config.toml"));
     }
 
     #[test]

@@ -85,7 +85,6 @@ impl Launcher {
                     self.show_launcher()
                 }
             }
-            AppCommand::OpenPreferences => self.open_preferences_window(),
             AppCommand::ReloadPreferences => self.reload_preferences_from_disk(),
             AppCommand::Quit => iced::exit(),
         }

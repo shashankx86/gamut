@@ -5,7 +5,6 @@ use crate::core::ipc::IpcCommand;
 pub(crate) enum AppCommand {
     ShowLauncher { target_output: Option<OutputTarget> },
     ToggleLauncher { target_output: Option<OutputTarget> },
-    OpenPreferences,
     ReloadPreferences,
     Quit,
 }
@@ -19,7 +18,6 @@ impl AppCommand {
             IpcCommand::Toggle { target_output } => Some(Self::ToggleLauncher {
                 target_output: target_output.map(|name| OutputTarget { name }),
             }),
-            IpcCommand::OpenPreferences => Some(Self::OpenPreferences),
             IpcCommand::ReloadPreferences => Some(Self::ReloadPreferences),
             IpcCommand::Quit => Some(Self::Quit),
             IpcCommand::Ping => None,

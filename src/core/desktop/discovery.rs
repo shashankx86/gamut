@@ -1,9 +1,9 @@
 use super::icons::resolve_app_icon;
 use super::model::{DesktopApp, IconResolveRequest};
 use freedesktop_desktop_entry::{
-    default_paths, get_languages_from_env, DesktopEntry, Iter, PathSource,
+    DesktopEntry, Iter, PathSource, default_paths, get_languages_from_env,
 };
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -167,7 +167,7 @@ fn canonical_name_for_dedupe(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{dedupe_key, should_replace_existing, DesktopApp, ScoredApp};
+    use super::{DesktopApp, ScoredApp, dedupe_key, should_replace_existing};
 
     fn app(name: &str, command: &str, exec_line: &str, args: Vec<&str>) -> DesktopApp {
         DesktopApp::new(

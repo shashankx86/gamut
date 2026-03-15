@@ -4,10 +4,10 @@ mod shortcuts;
 mod system;
 
 pub use appearance::{
-    normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
+    AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
 };
 pub use layout::{LauncherPlacement, LauncherSize, LayoutPreferences, RadiusPreference};
-pub use shortcuts::{ShortcutBinding, ShortcutPreferences};
+pub use shortcuts::{ShortcutAction, ShortcutBinding, ShortcutPreferences};
 pub use system::SystemPreferences;
 
 use serde::{Deserialize, Serialize};
@@ -35,8 +35,8 @@ impl Default for AppPreferences {
 #[cfg(test)]
 mod tests {
     use super::{
-        AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ShortcutBinding,
-        ShortcutPreferences, ThemePreference,
+        AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ShortcutAction,
+        ShortcutBinding, ShortcutPreferences, ThemePreference,
     };
     use std::str::FromStr;
 
@@ -78,5 +78,13 @@ mod tests {
     #[test]
     fn shortcut_binding_rejects_missing_key() {
         assert!(ShortcutBinding::from_str("Ctrl+Alt").is_err());
+    }
+
+    #[test]
+    fn shortcut_action_parses_cli_name() {
+        assert_eq!(
+            ShortcutAction::from_str("expand-or-move-down").expect("action should parse"),
+            ShortcutAction::ExpandOrMoveDown,
+        );
     }
 }

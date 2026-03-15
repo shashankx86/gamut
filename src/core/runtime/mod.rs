@@ -1,10 +1,10 @@
 mod daemon;
 
-use crate::core::cli::{parse_command, print_help, print_version, CliCommand, CliMode};
+use crate::core::cli::{CliCommand, CliMode, parse_command, print_help, print_version};
 use crate::core::display::active_output_target;
 use crate::core::ipc::IpcCommand;
 use crate::core::logging;
-use crate::ui;
+use crate::core::preferences::run_config;
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -25,18 +25,23 @@ where
     I: IntoIterator<Item = OsString>,
 {
     match parse_command(args) {
-        CliCommand::Help => {
-            print_help();
+        Ok(CliCommand::Help(topic)) => {
+            print_help(topic);
             Ok(())
         }
-        CliCommand::Version => {
+        Ok(CliCommand::Version) => {
             print_version();
             Ok(())
         }
-        CliCommand::Run(mode) => {
+        Ok(CliCommand::Config(command)) => run_config(command),
+        Ok(CliCommand::Run(mode)) => {
             logging::init();
             info!("handling {} command", mode.name());
             run_mode(mode)
+        }
+        Err(error) => {
+            print_help(error.help_topic());
+            Err(error.message().to_string().into())
         }
     }
 }
@@ -47,7 +52,6 @@ fn run_mode(mode: CliMode) -> Result<(), DynError> {
         CliMode::Toggle => daemon::ensure_daemon_and_send(IpcCommand::Toggle {
             target_output: active_output_target().map(|target| target.name),
         }),
-        CliMode::Preferences => ui::run_preferences(),
         CliMode::Quit => daemon::send_quit(),
     }
 }

@@ -1,103 +1,35 @@
 mod command;
 mod output;
 
-pub use command::{CliCommand, CliMode, parse_command};
+pub use command::{CliCommand, CliMode, HelpTopic, parse_command};
 pub use output::{print_help, print_version};
 
 #[cfg(test)]
 mod tests {
-    use super::output::{help_text, version_text};
-    use super::{CliCommand, CliMode, parse_command};
-    use std::ffi::OsString;
+    use super::output::{config_help_text, help_text, shortcut_help_text, version_text};
 
     #[test]
-    fn defaults_to_toggle() {
-        assert_eq!(
-            parse_command(Vec::<OsString>::new()),
-            CliCommand::Run(CliMode::Toggle),
-        );
-    }
-
-    #[test]
-    fn parses_known_flags_in_any_position() {
-        assert_eq!(
-            parse_command([OsString::from("--what"), OsString::from("--daemon")]),
-            CliCommand::Run(CliMode::Daemon),
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("--quit")]),
-            CliCommand::Run(CliMode::Quit),
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("--preferences")]),
-            CliCommand::Run(CliMode::Preferences),
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("--toggle")]),
-            CliCommand::Run(CliMode::Toggle),
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("--help")]),
-            CliCommand::Help,
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("-h")]),
-            CliCommand::Help,
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("--version")]),
-            CliCommand::Version,
-        );
-        assert_eq!(
-            parse_command([OsString::from("value"), OsString::from("-v")]),
-            CliCommand::Version,
-        );
-    }
-
-    #[test]
-    fn last_known_mode_flag_wins_when_multiple_are_provided() {
-        assert_eq!(
-            parse_command([
-                OsString::from("--daemon"),
-                OsString::from("--preferences"),
-                OsString::from("--quit"),
-                OsString::from("--toggle"),
-            ]),
-            CliCommand::Run(CliMode::Toggle),
-        );
-    }
-
-    #[test]
-    fn help_takes_precedence_over_other_flags() {
-        assert_eq!(
-            parse_command([
-                OsString::from("--daemon"),
-                OsString::from("--version"),
-                OsString::from("--help"),
-                OsString::from("--quit"),
-            ]),
-            CliCommand::Help,
-        );
-    }
-
-    #[test]
-    fn version_takes_precedence_over_mode_flags() {
-        assert_eq!(
-            parse_command([
-                OsString::from("--daemon"),
-                OsString::from("--version"),
-                OsString::from("--quit"),
-            ]),
-            CliCommand::Version,
-        );
-    }
-
-    #[test]
-    fn help_text_lists_version_option() {
+    fn root_help_mentions_config_command() {
         let help = help_text();
 
-        assert!(help.contains("-v, --version"));
-        assert!(help.contains("gamut [OPTIONS]"));
+        assert!(help.contains("config"));
+        assert!(help.contains("gamut [OPTIONS] [COMMAND]"));
+    }
+
+    #[test]
+    fn config_help_mentions_shortcut_modes() {
+        let help = config_help_text();
+
+        assert!(help.contains("shortcut"));
+        assert!(help.contains("config set"));
+    }
+
+    #[test]
+    fn shortcut_help_mentions_interactive_mode() {
+        let help = shortcut_help_text();
+
+        assert!(help.contains("interactive"));
+        assert!(help.contains("Ctrl+K"));
     }
 
     #[test]
