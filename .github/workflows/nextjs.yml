@@ -1,4 +1,4 @@
-# Sample workflow for building and deploying a Next.js (Fumadocs) site to GitHub Pages
+# Sample workflow for building and deploying a Next.js site to GitHub Pages using Bun
 name: Deploy Next.js site to Pages
 
 on:
@@ -25,57 +25,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Detect package manager
-        id: detect-package-manager
-        # Note: Updated to look inside the docs/ folder
-        run: |
-          if [ -f "${{ github.workspace }}/docs/yarn.lock" ]; then
-            echo "manager=yarn" >> $GITHUB_OUTPUT
-            echo "command=install" >> $GITHUB_OUTPUT
-            echo "runner=yarn" >> $GITHUB_OUTPUT
-            exit 0
-          elif [ -f "${{ github.workspace }}/docs/package.json" ]; then
-            echo "manager=npm" >> $GITHUB_OUTPUT
-            echo "command=ci" >> $GITHUB_OUTPUT
-            echo "runner=npx --no-install" >> $GITHUB_OUTPUT
-            exit 0
-          else
-            echo "Unable to determine package manager"
-            exit 1
-          fi
-          
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: ${{ steps.detect-package-manager.outputs.manager }}
-          cache-dependency-path: ./docs/package-lock.json # Or yarn.lock
+          node-version: "24" # Updated to 24 to fix the future deprecation warning
+          
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
           
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
           static_site_generator: next
           
-      - name: Restore cache
+      - name: Restore Next.js cache
         uses: actions/cache@v4
         with:
-          # Note: Updated path to look inside docs/
-          path: |
-            docs/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/package-lock.json', 'docs/**/yarn.lock') }}-${{ hashFiles('docs/**.[jt]s', 'docs/**.[jt]sx') }}
+          path: docs/.next/cache
+          # Updated to track Bun's lockfiles for caching
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/bun.lock', 'docs/**/bun.lockb') }}-${{ hashFiles('docs/**.[jt]s', 'docs/**.[jt]sx') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/package-lock.json', 'docs/**/yarn.lock') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('docs/**/bun.lock', 'docs/**/bun.lockb') }}-
             
       - name: Install dependencies
-        run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+        run: bun install
         
       - name: Build with Next.js
-        run: ${{ steps.detect-package-manager.outputs.runner }} next build
+        run: bun run build
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Note: Updated to upload the out folder from inside docs/
           path: ./docs/out
 
   deploy:
