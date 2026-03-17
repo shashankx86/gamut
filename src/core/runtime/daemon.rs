@@ -1,4 +1,4 @@
-use super::{DAEMON_START_DELAY, DAEMON_START_RETRIES, DynError};
+use super::{DynError, DAEMON_START_DELAY, DAEMON_START_RETRIES};
 use crate::core::ipc::{self, IpcCommand};
 use crate::core::preferences::load_preferences;
 use crate::core::tray;
@@ -45,7 +45,7 @@ fn spawn_daemon_process() -> Result<Child, DynError> {
     debug!("spawning daemon process from {}", current_exe.display());
 
     let child = Command::new(current_exe)
-        .arg("--daemon")
+        .arg("daemon")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())

@@ -30,6 +30,7 @@ struct CachedAppCatalog {
 #[derive(Debug, Serialize, Deserialize)]
 struct CachedDesktopApp {
     name: String,
+    entry_type: String,
     exec_line: String,
     command: String,
     args: Vec<String>,
@@ -184,6 +185,7 @@ impl From<CachedDesktopApp> for DesktopApp {
     fn from(value: CachedDesktopApp) -> Self {
         DesktopApp::new(
             value.name,
+            value.entry_type,
             value.exec_line,
             value.command,
             value.args,
@@ -198,6 +200,7 @@ impl From<DesktopApp> for CachedDesktopApp {
     fn from(value: DesktopApp) -> Self {
         Self {
             name: value.name,
+            entry_type: value.entry_type,
             exec_line: value.exec_line,
             command: value.command,
             args: value.args,
@@ -211,8 +214,8 @@ impl From<DesktopApp> for CachedDesktopApp {
 #[cfg(test)]
 mod tests {
     use super::{
-        APP_CACHE_FORMAT_VERSION, CachedAppCatalog, current_timestamp_secs,
-        load_cached_apps_from_path, save_cached_apps_to_path,
+        current_timestamp_secs, load_cached_apps_from_path, save_cached_apps_to_path,
+        CachedAppCatalog, APP_CACHE_FORMAT_VERSION,
     };
     use crate::core::desktop::DesktopApp;
     use bincode::Options;
@@ -234,6 +237,7 @@ mod tests {
     fn sample_app() -> DesktopApp {
         DesktopApp::new(
             "Firefox".to_string(),
+            "Application".to_string(),
             "/usr/bin/firefox %u".to_string(),
             "/usr/bin/firefox".to_string(),
             vec!["%u".to_string()],

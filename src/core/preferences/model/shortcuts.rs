@@ -1,20 +1,72 @@
+use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ShortcutPreferences {
     pub launch_selected: ShortcutBinding,
-    pub expand_or_move_down: ShortcutBinding,
+    pub expand: ShortcutBinding,
+    pub move_down: ShortcutBinding,
     pub move_up: ShortcutBinding,
     pub close_launcher: ShortcutBinding,
+}
+
+impl<'de> Deserialize<'de> for ShortcutPreferences {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(default)]
+        struct ShortcutPreferencesWire {
+            launch_selected: ShortcutBinding,
+            expand: Option<ShortcutBinding>,
+            move_down: Option<ShortcutBinding>,
+            #[serde(alias = "expand_or_move_down")]
+            legacy_expand_or_move_down: Option<ShortcutBinding>,
+            move_up: ShortcutBinding,
+            close_launcher: ShortcutBinding,
+        }
+
+        impl Default for ShortcutPreferencesWire {
+            fn default() -> Self {
+                let defaults = ShortcutPreferences::default();
+
+                Self {
+                    launch_selected: defaults.launch_selected,
+                    expand: Some(defaults.expand),
+                    move_down: Some(defaults.move_down),
+                    legacy_expand_or_move_down: None,
+                    move_up: defaults.move_up,
+                    close_launcher: defaults.close_launcher,
+                }
+            }
+        }
+
+        let wire = ShortcutPreferencesWire::deserialize(deserializer)?;
+        let legacy = wire.legacy_expand_or_move_down.clone();
+        let defaults = ShortcutPreferences::default();
+
+        Ok(Self {
+            launch_selected: wire.launch_selected,
+            expand: wire
+                .expand
+                .or_else(|| legacy.clone())
+                .unwrap_or(defaults.expand),
+            move_down: wire.move_down.or(legacy).unwrap_or(defaults.move_down),
+            move_up: wire.move_up,
+            close_launcher: wire.close_launcher,
+        })
+    }
 }
 
 impl Default for ShortcutPreferences {
     fn default() -> Self {
         Self {
             launch_selected: ShortcutBinding::named("Enter"),
-            expand_or_move_down: ShortcutBinding::named("ArrowDown"),
+            expand: ShortcutBinding::named("ArrowDown"),
+            move_down: ShortcutBinding::named("ArrowDown"),
             move_up: ShortcutBinding::named("ArrowUp"),
             close_launcher: ShortcutBinding::named("Escape"),
         }
@@ -25,7 +77,8 @@ impl ShortcutPreferences {
     pub fn binding(&self, action: ShortcutAction) -> &ShortcutBinding {
         match action {
             ShortcutAction::LaunchSelected => &self.launch_selected,
-            ShortcutAction::ExpandOrMoveDown => &self.expand_or_move_down,
+            ShortcutAction::Expand => &self.expand,
+            ShortcutAction::MoveDown => &self.move_down,
             ShortcutAction::MoveUp => &self.move_up,
             ShortcutAction::CloseLauncher => &self.close_launcher,
         }
@@ -36,36 +89,15 @@ impl ShortcutPreferences {
         action: ShortcutAction,
         binding: ShortcutBinding,
     ) -> Result<(), String> {
-        let mut next = self.clone();
-        *next.binding_mut(action) = binding;
-        next.validate_unique()?;
-        *self = next;
-        Ok(())
-    }
-
-    pub fn validate_unique(&self) -> Result<(), String> {
-        for (index, left_action) in ShortcutAction::ALL.iter().copied().enumerate() {
-            for right_action in ShortcutAction::ALL.iter().copied().skip(index + 1) {
-                if self
-                    .binding(left_action)
-                    .same_as(self.binding(right_action))
-                {
-                    return Err(format!(
-                        "{} conflicts with {}.",
-                        left_action.label(),
-                        right_action.label()
-                    ));
-                }
-            }
-        }
-
+        *self.binding_mut(action) = binding;
         Ok(())
     }
 
     fn binding_mut(&mut self, action: ShortcutAction) -> &mut ShortcutBinding {
         match action {
             ShortcutAction::LaunchSelected => &mut self.launch_selected,
-            ShortcutAction::ExpandOrMoveDown => &mut self.expand_or_move_down,
+            ShortcutAction::Expand => &mut self.expand,
+            ShortcutAction::MoveDown => &mut self.move_down,
             ShortcutAction::MoveUp => &mut self.move_up,
             ShortcutAction::CloseLauncher => &mut self.close_launcher,
         }
@@ -75,15 +107,17 @@ impl ShortcutPreferences {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShortcutAction {
     LaunchSelected,
-    ExpandOrMoveDown,
+    Expand,
+    MoveDown,
     MoveUp,
     CloseLauncher,
 }
 
 impl ShortcutAction {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::LaunchSelected,
-        Self::ExpandOrMoveDown,
+        Self::Expand,
+        Self::MoveDown,
         Self::MoveUp,
         Self::CloseLauncher,
     ];
@@ -91,7 +125,8 @@ impl ShortcutAction {
     pub const fn config_key(self) -> &'static str {
         match self {
             Self::LaunchSelected => "shortcuts.launch_selected",
-            Self::ExpandOrMoveDown => "shortcuts.expand_or_move_down",
+            Self::Expand => "shortcuts.expand",
+            Self::MoveDown => "shortcuts.move_down",
             Self::MoveUp => "shortcuts.move_up",
             Self::CloseLauncher => "shortcuts.close_launcher",
         }
@@ -100,7 +135,8 @@ impl ShortcutAction {
     pub const fn slug(self) -> &'static str {
         match self {
             Self::LaunchSelected => "launch-selected",
-            Self::ExpandOrMoveDown => "expand-or-move-down",
+            Self::Expand => "expand",
+            Self::MoveDown => "move-down",
             Self::MoveUp => "move-up",
             Self::CloseLauncher => "close-launcher",
         }
@@ -109,7 +145,8 @@ impl ShortcutAction {
     pub const fn label(self) -> &'static str {
         match self {
             Self::LaunchSelected => "Launch selected result",
-            Self::ExpandOrMoveDown => "Expand or move down",
+            Self::Expand => "Expand results",
+            Self::MoveDown => "Move down",
             Self::MoveUp => "Move up",
             Self::CloseLauncher => "Close launcher",
         }
@@ -118,7 +155,8 @@ impl ShortcutAction {
     pub const fn description(self) -> &'static str {
         match self {
             Self::LaunchSelected => "Runs the highlighted application or command.",
-            Self::ExpandOrMoveDown => "Expands the empty launcher or moves selection down.",
+            Self::Expand => "Expands the empty launcher to show results.",
+            Self::MoveDown => "Moves the highlighted selection downward.",
             Self::MoveUp => "Moves the highlighted selection upward.",
             Self::CloseLauncher => "Hides the launcher window.",
         }
@@ -137,11 +175,13 @@ impl FromStr for ShortcutAction {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match normalize_action_name(value).as_str() {
             "launchselected" | "shortcutslaunchselected" => Ok(Self::LaunchSelected),
-            "expandormovedown" | "shortcutsexpandormovedown" => Ok(Self::ExpandOrMoveDown),
+            "expand" | "shortcutsexpand" => Ok(Self::Expand),
+            "expandormovedown" => Ok(Self::MoveDown),
+            "movedown" | "shortcutsmovedown" => Ok(Self::MoveDown),
             "moveup" | "shortcutsmoveup" => Ok(Self::MoveUp),
             "closelauncher" | "shortcutscloselauncher" => Ok(Self::CloseLauncher),
             _ => Err(
-                "expected one of: launch-selected, expand-or-move-down, move-up, close-launcher"
+                "expected one of: launch-selected, expand, move-down, move-up, close-launcher"
                     .to_string(),
             ),
         }
@@ -170,14 +210,6 @@ impl ShortcutBinding {
 
     pub fn normalized_key(&self) -> String {
         normalize_key_name(&self.key)
-    }
-
-    pub fn same_as(&self, other: &Self) -> bool {
-        self.ctrl == other.ctrl
-            && self.alt == other.alt
-            && self.shift == other.shift
-            && self.super_key == other.super_key
-            && self.normalized_key() == other.normalized_key()
     }
 }
 
@@ -289,16 +321,55 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_shortcuts_are_rejected() {
+    fn duplicate_shortcuts_are_allowed() {
         let mut shortcuts = ShortcutPreferences::default();
 
-        let error = shortcuts
+        shortcuts
             .update_binding(
                 ShortcutAction::MoveUp,
                 ShortcutBinding::from_str("ArrowDown").expect("binding should parse"),
             )
-            .expect_err("duplicate bindings should be rejected");
+            .expect("duplicate bindings should be allowed");
 
-        assert!(error.contains("Move up"));
+        assert_eq!(shortcuts.move_up.to_string(), "ArrowDown");
+    }
+
+    #[test]
+    fn legacy_expand_or_move_down_migrates_to_expand_and_move_down() {
+        let shortcuts: ShortcutPreferences = toml::from_str(
+            r#"
+[launch_selected]
+ctrl = false
+alt = false
+shift = false
+super_key = false
+key = "Enter"
+
+[expand_or_move_down]
+ctrl = false
+alt = false
+shift = false
+super_key = false
+key = "ArrowDown"
+
+[move_up]
+ctrl = false
+alt = false
+shift = false
+super_key = false
+key = "ArrowUp"
+
+[close_launcher]
+ctrl = false
+alt = false
+shift = false
+super_key = false
+key = "Escape"
+"#,
+        )
+        .expect("legacy shortcut config should parse");
+
+        assert_eq!(shortcuts.expand.to_string(), "ArrowDown");
+        assert_eq!(shortcuts.move_down.to_string(), "ArrowDown");
     }
 }

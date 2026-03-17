@@ -47,9 +47,7 @@ fn capture_and_apply(
         println!("{}", action.label());
         println!("Current: {}", shortcuts.binding(action));
         println!("Press the new key combo now.");
-        println!(
-            "Ctrl+C aborts. Terminal capture usually supports Ctrl/Alt/Shift; use manual mode for Super."
-        );
+        println!("Ctrl+C aborts.");
 
         let binding = capture_binding()?;
         println!("Detected: {binding}");

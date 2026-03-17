@@ -1,40 +1,51 @@
-use crate::core::theme::default_theme_colors;
+use crate::core::theme::{
+    classify_theme_colors, default_custom_theme_colors, default_theme_colors,
+};
 use dark_light::Mode as SystemThemeMode;
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
+
+use super::RadiusPreference;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AppearancePreferences {
     pub theme: ThemePreference,
-    pub schemes: ThemeSchemes,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub themes: BTreeMap<String, ThemeColors>,
     pub radius: RadiusPreference,
-    pub custom_radius: f32,
 }
 
 impl AppearancePreferences {
-    pub fn scheme(&self, scheme: ThemeSchemeId) -> &ThemeColors {
-        self.schemes.scheme(scheme)
+    pub fn upsert_custom_theme(&mut self, name: &str) -> Result<&mut ThemeColors, String> {
+        let key = normalize_custom_theme_name(name)?;
+        Ok(self
+            .themes
+            .entry(key)
+            .or_insert_with(default_custom_theme_colors))
     }
 
-    pub fn scheme_mut(&mut self, scheme: ThemeSchemeId) -> &mut ThemeColors {
-        self.schemes.scheme_mut(scheme)
+    pub(crate) fn resolved_theme(&self) -> ResolvedTheme {
+        self.resolved_theme_for_mode(dark_light::detect().unwrap_or(SystemThemeMode::Unspecified))
     }
 
-    pub fn resolved_scheme(&self) -> ThemeSchemeId {
-        self.resolved_scheme_for_mode(dark_light::detect().unwrap_or(SystemThemeMode::Unspecified))
-    }
-
-    pub fn resolved_scheme_for_mode(&self, system_mode: SystemThemeMode) -> ThemeSchemeId {
-        match self.theme {
-            ThemePreference::Light => ThemeSchemeId::Light,
-            ThemePreference::Dark => ThemeSchemeId::Dark,
-            ThemePreference::System => match system_mode {
-                SystemThemeMode::Light => ThemeSchemeId::Light,
-                _ => ThemeSchemeId::Dark,
-            },
+    pub(crate) fn resolved_theme_for_mode(&self, system_mode: SystemThemeMode) -> ResolvedTheme {
+        match &self.theme {
+            ThemePreference::Light => resolve_builtin_theme(ThemeSchemeId::Light),
+            ThemePreference::Dark => resolve_builtin_theme(ThemeSchemeId::Dark),
+            ThemePreference::System => resolve_builtin_theme(system_theme(system_mode)),
+            ThemePreference::Custom(name) => self
+                .themes
+                .get(name)
+                .map(|colors| ResolvedTheme {
+                    name: name.clone(),
+                    colors: colors.clone(),
+                    variant: classify_theme_colors(colors),
+                })
+                .unwrap_or_else(|| resolve_builtin_theme(system_theme(system_mode))),
         }
     }
 }
@@ -43,9 +54,8 @@ impl Default for AppearancePreferences {
     fn default() -> Self {
         Self {
             theme: ThemePreference::System,
-            schemes: ThemeSchemes::default(),
+            themes: BTreeMap::new(),
             radius: RadiusPreference::Small,
-            custom_radius: 10.0,
         }
     }
 }
@@ -59,10 +69,8 @@ impl<'de> Deserialize<'de> for AppearancePreferences {
         #[serde(default)]
         struct AppearancePreferencesWire {
             theme: ThemePreference,
-            schemes: ThemeSchemes,
-            custom_theme: Option<ThemeColors>,
+            themes: BTreeMap<String, ThemeColors>,
             radius: RadiusPreference,
-            custom_radius: f32,
         }
 
         impl Default for AppearancePreferencesWire {
@@ -70,57 +78,37 @@ impl<'de> Deserialize<'de> for AppearancePreferences {
                 let defaults = AppearancePreferences::default();
                 Self {
                     theme: defaults.theme,
-                    schemes: defaults.schemes,
-                    custom_theme: None,
+                    themes: defaults.themes,
                     radius: defaults.radius,
-                    custom_radius: defaults.custom_radius,
                 }
             }
         }
 
         let wire = AppearancePreferencesWire::deserialize(deserializer)?;
-        let mut schemes = wire.schemes;
-
-        if let Some(custom_theme) = wire.custom_theme {
-            schemes.dark = custom_theme;
-        }
-
-        // Migrate prior bundled light defaults to the current neutral light
-        // palette so existing installs do not keep stale tinted colors.
-        let old_light = ThemeColors::new("#F8F9FB", "#34446D", "#416EF5");
-        let previous_light = ThemeColors::new("#F8F9FB", "#1C1D21", "#416EF5");
-        let current_light = ThemeColors::new("#F3F4F6", "#181A1F", "#416EF5");
-        let grayscale_light = ThemeColors::new("#F4F4F4", "#1A1A1A", "#416EF5");
-        if schemes.light == old_light
-            || schemes.light == previous_light
-            || schemes.light == current_light
-            || schemes.light == grayscale_light
-        {
-            schemes.light = default_light_theme_colors();
-        }
 
         Ok(Self {
             theme: wire.theme,
-            schemes,
+            themes: normalize_custom_themes(wire.themes),
             radius: wire.radius,
-            custom_radius: wire.custom_radius,
         })
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThemePreference {
     Light,
     Dark,
     System,
+    Custom(String),
 }
 
 impl ThemePreference {
-    pub const fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::System => "system",
             Self::Light => "light",
             Self::Dark => "dark",
+            Self::Custom(name) => name,
         }
     }
 }
@@ -152,9 +140,9 @@ impl FromStr for ThemePreference {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.trim().to_ascii_lowercase().as_str() {
             "light" => Ok(Self::Light),
-            "dark" | "custom" => Ok(Self::Dark),
+            "dark" => Ok(Self::Dark),
             "system" => Ok(Self::System),
-            _ => Err("expected one of: system, light, dark".to_string()),
+            _ => Ok(Self::Custom(normalize_custom_theme_name(value)?)),
         }
     }
 }
@@ -166,9 +154,15 @@ impl<'de> Deserialize<'de> for ThemePreference {
     {
         let value = String::deserialize(deserializer)?;
 
-        Self::from_str(&value)
-            .map_err(|_| de::Error::unknown_variant(&value, &["light", "dark", "system", "custom"]))
+        Self::from_str(&value).map_err(de::Error::custom)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedTheme {
+    pub(crate) name: String,
+    pub(crate) colors: ThemeColors,
+    pub(crate) variant: ThemeSchemeId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,44 +204,25 @@ impl ThemeColors {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ThemeSchemes {
-    pub light: ThemeColors,
-    pub dark: ThemeColors,
-}
+pub fn normalize_custom_theme_name(value: &str) -> Result<String, String> {
+    let normalized = value.trim().to_ascii_lowercase().replace(' ', "-");
 
-impl ThemeSchemes {
-    pub fn scheme(&self, scheme: ThemeSchemeId) -> &ThemeColors {
-        match scheme {
-            ThemeSchemeId::Light => &self.light,
-            ThemeSchemeId::Dark => &self.dark,
-        }
+    if normalized.is_empty() {
+        return Err("theme name cannot be empty".to_string());
     }
 
-    pub fn scheme_mut(&mut self, scheme: ThemeSchemeId) -> &mut ThemeColors {
-        match scheme {
-            ThemeSchemeId::Light => &mut self.light,
-            ThemeSchemeId::Dark => &mut self.dark,
-        }
+    if !normalized
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '-' | '_'))
+    {
+        return Err("theme name must use only letters, numbers, '-' or '_'".to_string());
     }
-}
 
-impl Default for ThemeSchemes {
-    fn default() -> Self {
-        Self {
-            light: default_light_theme_colors(),
-            dark: default_dark_theme_colors(),
-        }
+    if matches!(normalized.as_str(), "system" | "light" | "dark") {
+        return Err(format!("theme name `{normalized}` is reserved"));
     }
-}
 
-pub fn default_light_theme_colors() -> ThemeColors {
-    default_theme_colors(ThemeSchemeId::Light)
-}
-
-pub fn default_dark_theme_colors() -> ThemeColors {
-    default_theme_colors(ThemeSchemeId::Dark)
+    Ok(normalized)
 }
 
 pub fn normalize_hex_color(value: &str) -> Option<String> {
@@ -261,13 +236,40 @@ pub fn normalize_hex_color(value: &str) -> Option<String> {
     }
 }
 
-use super::RadiusPreference;
+fn normalize_custom_themes(themes: BTreeMap<String, ThemeColors>) -> BTreeMap<String, ThemeColors> {
+    themes
+        .into_iter()
+        .filter_map(|(name, colors)| {
+            normalize_custom_theme_name(&name)
+                .ok()
+                .map(|key| (key, colors))
+        })
+        .collect()
+}
+
+fn resolve_builtin_theme(scheme: ThemeSchemeId) -> ResolvedTheme {
+    ResolvedTheme {
+        name: scheme.as_str().to_string(),
+        colors: default_theme_colors(scheme),
+        variant: scheme,
+    }
+}
+
+fn system_theme(mode: SystemThemeMode) -> ThemeSchemeId {
+    match mode {
+        SystemThemeMode::Light => ThemeSchemeId::Light,
+        _ => ThemeSchemeId::Dark,
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::{
-        AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
+        normalize_custom_theme_name, normalize_hex_color, AppearancePreferences, ThemeColors,
+        ThemePreference, ThemeSchemeId,
     };
+    use dark_light::Mode as SystemThemeMode;
+    use std::str::FromStr;
 
     #[test]
     fn normalizes_hex_color_values() {
@@ -280,52 +282,43 @@ mod tests {
     }
 
     #[test]
-    fn legacy_custom_theme_migrates_to_dark_scheme() {
-        let appearance: AppearancePreferences = toml::from_str(
-            r##"
-theme = "custom"
-radius = "small"
-custom_radius = 10.0
-
-[custom_theme]
-background = "#112233"
-text = "#EEF0F3"
-accent = "#5588FF"
-"##,
-        )
-        .expect("legacy appearance preferences should deserialize");
-
-        assert_eq!(appearance.theme, ThemePreference::Dark);
+    fn custom_theme_names_are_normalized() {
         assert_eq!(
-            appearance.scheme(ThemeSchemeId::Dark),
-            &ThemeColors::new("#112233", "#EEF0F3", "#5588FF"),
+            normalize_custom_theme_name(" Orange Theme ").expect("theme name should normalize"),
+            "orange-theme"
+        );
+        assert!(normalize_custom_theme_name("light").is_err());
+    }
+
+    #[test]
+    fn custom_theme_preference_parses_named_themes() {
+        assert_eq!(
+            ThemePreference::from_str("orange").expect("theme should parse"),
+            ThemePreference::Custom("orange".to_string())
         );
     }
 
     #[test]
-    fn previous_light_defaults_migrate_to_current_light_palette() {
+    fn resolved_custom_theme_uses_custom_colors() {
         let appearance: AppearancePreferences = toml::from_str(
             r##"
-theme = "light"
+theme = "orange"
 radius = "small"
-custom_radius = 10.0
 
-[schemes.light]
-background = "#F8F9FB"
-text = "#1C1D21"
-accent = "#416EF5"
-
-[schemes.dark]
-background = "#151516"
-text = "#EBEDF2"
-accent = "#5E8BFF"
+[themes.orange]
+background = "#FFF4E8"
+text = "#2D1606"
+accent = "#FF7A00"
 "##,
         )
-        .expect("previous light defaults should deserialize");
+        .expect("custom themes should deserialize");
+
+        let resolved = appearance.resolved_theme_for_mode(SystemThemeMode::Dark);
 
         assert_eq!(
-            appearance.scheme(ThemeSchemeId::Light),
-            &ThemeColors::new("#F3F4F6", "#1F2328", "#416EF5"),
+            resolved.colors,
+            ThemeColors::new("#FFF4E8", "#2D1606", "#FF7A00"),
         );
+        assert_eq!(resolved.variant, ThemeSchemeId::Light);
     }
 }

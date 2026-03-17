@@ -132,10 +132,9 @@ mod tests {
     }
 
     #[test]
-    fn custom_radius_overrides_default_rounding() {
+    fn none_radius_removes_rounding() {
         let mut app_preferences = AppPreferences::default();
-        app_preferences.appearance.radius = crate::core::preferences::RadiusPreference::Custom;
-        app_preferences.appearance.custom_radius = 18.0;
+        app_preferences.appearance.radius = crate::core::preferences::RadiusPreference::None;
 
         let layout = LauncherLayout::from_monitor_size(
             Some(Size::new(1920.0, 1080.0)),
@@ -143,7 +142,7 @@ mod tests {
             &app_preferences,
         );
 
-        approx_eq(layout.panel_radius, 18.0);
-        approx_eq(layout.item_radius, 14.4);
+        approx_eq(layout.panel_radius, 0.0);
+        approx_eq(layout.item_radius, 0.0);
     }
 }

@@ -6,13 +6,9 @@ use std::str::FromStr;
 pub enum ConfigKey {
     AppearanceTheme,
     AppearanceRadius,
-    AppearanceCustomRadius,
-    AppearanceLightBackground,
-    AppearanceLightText,
-    AppearanceLightAccent,
-    AppearanceDarkBackground,
-    AppearanceDarkText,
-    AppearanceDarkAccent,
+    AppearanceThemeBackground,
+    AppearanceThemeText,
+    AppearanceThemeAccent,
     LayoutSize,
     LayoutPlacement,
     LayoutCustomTopMargin,
@@ -21,21 +17,18 @@ pub enum ConfigKey {
 }
 
 impl ConfigKey {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 14] = [
         Self::AppearanceTheme,
         Self::AppearanceRadius,
-        Self::AppearanceCustomRadius,
-        Self::AppearanceLightBackground,
-        Self::AppearanceLightText,
-        Self::AppearanceLightAccent,
-        Self::AppearanceDarkBackground,
-        Self::AppearanceDarkText,
-        Self::AppearanceDarkAccent,
+        Self::AppearanceThemeBackground,
+        Self::AppearanceThemeText,
+        Self::AppearanceThemeAccent,
         Self::LayoutSize,
         Self::LayoutPlacement,
         Self::LayoutCustomTopMargin,
         Self::Shortcut(ShortcutAction::LaunchSelected),
-        Self::Shortcut(ShortcutAction::ExpandOrMoveDown),
+        Self::Shortcut(ShortcutAction::Expand),
+        Self::Shortcut(ShortcutAction::MoveDown),
         Self::Shortcut(ShortcutAction::MoveUp),
         Self::Shortcut(ShortcutAction::CloseLauncher),
         Self::SystemStartAtLogin,
@@ -45,13 +38,9 @@ impl ConfigKey {
         match self {
             Self::AppearanceTheme => "appearance.theme",
             Self::AppearanceRadius => "appearance.radius",
-            Self::AppearanceCustomRadius => "appearance.custom_radius",
-            Self::AppearanceLightBackground => "appearance.schemes.light.background",
-            Self::AppearanceLightText => "appearance.schemes.light.text",
-            Self::AppearanceLightAccent => "appearance.schemes.light.accent",
-            Self::AppearanceDarkBackground => "appearance.schemes.dark.background",
-            Self::AppearanceDarkText => "appearance.schemes.dark.text",
-            Self::AppearanceDarkAccent => "appearance.schemes.dark.accent",
+            Self::AppearanceThemeBackground => "appearance.theme.background",
+            Self::AppearanceThemeText => "appearance.theme.text",
+            Self::AppearanceThemeAccent => "appearance.theme.accent",
             Self::LayoutSize => "layout.size",
             Self::LayoutPlacement => "layout.placement",
             Self::LayoutCustomTopMargin => "layout.custom_top_margin",
@@ -62,16 +51,14 @@ impl ConfigKey {
 
     pub const fn description(self) -> &'static str {
         match self {
-            Self::AppearanceTheme => "Launcher theme: system, light, dark",
-            Self::AppearanceRadius => "Corner radius preset: small, medium, large, custom",
-            Self::AppearanceCustomRadius => "Custom corner radius in pixels",
-            Self::AppearanceLightBackground => "Light theme background hex color",
-            Self::AppearanceLightText => "Light theme text hex color",
-            Self::AppearanceLightAccent => "Light theme accent hex color",
-            Self::AppearanceDarkBackground => "Dark theme background hex color",
-            Self::AppearanceDarkText => "Dark theme text hex color",
-            Self::AppearanceDarkAccent => "Dark theme accent hex color",
-            Self::LayoutSize => "Launcher size: small, medium, large, extra_large",
+            Self::AppearanceTheme => {
+                "Launcher theme: system, light, dark, or any custom theme name"
+            }
+            Self::AppearanceRadius => "Corner radius preset: none, small, medium, large",
+            Self::AppearanceThemeBackground => "Active custom theme background hex color",
+            Self::AppearanceThemeText => "Active custom theme text hex color",
+            Self::AppearanceThemeAccent => "Active custom theme accent hex color",
+            Self::LayoutSize => "Launcher size: small, medium, large",
             Self::LayoutPlacement => "Launcher placement: center, raised_center, custom",
             Self::LayoutCustomTopMargin => "Launcher top margin in pixels",
             Self::Shortcut(action) => action.description(),
@@ -83,13 +70,9 @@ impl ConfigKey {
         match self {
             Self::AppearanceTheme
             | Self::AppearanceRadius
-            | Self::AppearanceCustomRadius
-            | Self::AppearanceLightBackground
-            | Self::AppearanceLightText
-            | Self::AppearanceLightAccent
-            | Self::AppearanceDarkBackground
-            | Self::AppearanceDarkText
-            | Self::AppearanceDarkAccent => "appearance",
+            | Self::AppearanceThemeBackground
+            | Self::AppearanceThemeText
+            | Self::AppearanceThemeAccent => "appearance",
             Self::LayoutSize | Self::LayoutPlacement | Self::LayoutCustomTopMargin => "layout",
             Self::Shortcut(_) => "shortcuts",
             Self::SystemStartAtLogin => "system",
@@ -110,18 +93,16 @@ impl FromStr for ConfigKey {
         match normalize(value).as_str() {
             "appearancetheme" => Ok(Self::AppearanceTheme),
             "appearanceradius" => Ok(Self::AppearanceRadius),
-            "appearancecustomradius" => Ok(Self::AppearanceCustomRadius),
-            "appearanceschemeslightbackground" => Ok(Self::AppearanceLightBackground),
-            "appearanceschemeslighttext" => Ok(Self::AppearanceLightText),
-            "appearanceschemeslightaccent" => Ok(Self::AppearanceLightAccent),
-            "appearanceschemesdarkbackground" => Ok(Self::AppearanceDarkBackground),
-            "appearanceschemesdarktext" => Ok(Self::AppearanceDarkText),
-            "appearanceschemesdarkaccent" => Ok(Self::AppearanceDarkAccent),
+            "appearancethemebackground" => Ok(Self::AppearanceThemeBackground),
+            "appearancethemetext" => Ok(Self::AppearanceThemeText),
+            "appearancethemeaccent" => Ok(Self::AppearanceThemeAccent),
             "layoutsize" => Ok(Self::LayoutSize),
             "layoutplacement" => Ok(Self::LayoutPlacement),
             "layoutcustomtopmargin" => Ok(Self::LayoutCustomTopMargin),
             "shortcutslaunchselected" => Ok(Self::Shortcut(ShortcutAction::LaunchSelected)),
-            "shortcutsexpandormovedown" => Ok(Self::Shortcut(ShortcutAction::ExpandOrMoveDown)),
+            "shortcutsexpand" => Ok(Self::Shortcut(ShortcutAction::Expand)),
+            "shortcutsexpandormovedown" => Ok(Self::Shortcut(ShortcutAction::MoveDown)),
+            "shortcutsmovedown" => Ok(Self::Shortcut(ShortcutAction::MoveDown)),
             "shortcutsmoveup" => Ok(Self::Shortcut(ShortcutAction::MoveUp)),
             "shortcutscloselauncher" => Ok(Self::Shortcut(ShortcutAction::CloseLauncher)),
             "systemstartatlogin" => Ok(Self::SystemStartAtLogin),
@@ -146,8 +127,8 @@ mod tests {
     #[test]
     fn config_keys_accept_dot_notation() {
         assert_eq!(
-            ConfigKey::from_str("appearance.schemes.dark.accent").expect("key should parse"),
-            ConfigKey::AppearanceDarkAccent,
+            ConfigKey::from_str("appearance.theme.accent").expect("key should parse"),
+            ConfigKey::AppearanceThemeAccent,
         );
         assert_eq!(
             ConfigKey::from_str("shortcuts.close_launcher").expect("key should parse"),

@@ -1,9 +1,10 @@
 use super::receiver::{app_command_stream, ipc_command_stream, search_results_stream};
 use super::{Launcher, Message};
-use iced::{Event, Subscription, event, time, window};
+use iced::{event, time, window, Event, Subscription};
 use std::time::Duration;
 
 const ACTIVE_TICK_MS: u64 = 25;
+const IDLE_TICK_MS: u64 = 1000;
 
 impl Launcher {
     pub(in crate::ui) fn subscription(&self) -> Subscription<Message> {
@@ -23,10 +24,13 @@ impl Launcher {
             Subscription::run_with(self.search_results_handle(), search_results_stream),
         ];
 
-        if self.needs_fast_tick() {
-            subscriptions
-                .push(time::every(Duration::from_millis(ACTIVE_TICK_MS)).map(|_| Message::Tick));
-        }
+        let tick_ms = if self.needs_fast_tick() {
+            ACTIVE_TICK_MS
+        } else {
+            IDLE_TICK_MS
+        };
+
+        subscriptions.push(time::every(Duration::from_millis(tick_ms)).map(|_| Message::Tick));
 
         Subscription::batch(subscriptions)
     }

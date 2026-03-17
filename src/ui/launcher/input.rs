@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
-use iced::keyboard::{self, Key, Modifiers, key::Named};
+use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{Task, window};
+use iced::{window, Task};
 
 impl Launcher {
     pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
@@ -102,15 +102,22 @@ impl Launcher {
         }
 
         if self.matches_shortcut(
-            &self.app_preferences.shortcuts.expand_or_move_down,
+            &self.app_preferences.shortcuts.expand,
+            &key,
+            modifiers,
+            physical_key,
+        ) && self.normalized_query.is_empty()
+            && self.results_target == 0.0
+        {
+            return self.expand_results();
+        }
+
+        if self.matches_shortcut(
+            &self.app_preferences.shortcuts.move_down,
             &key,
             modifiers,
             physical_key,
         ) {
-            if self.normalized_query.is_empty() && self.results_target == 0.0 {
-                return self.expand_results();
-            }
-
             let previous_rank = self.selected_rank;
             self.selection_revision = self.selection_revision.wrapping_add(1);
             self.move_selection(1);
@@ -255,43 +262,43 @@ impl Launcher {
             return false;
         }
 
-        let pressed = match key.as_ref() {
-            Key::Named(named) => named_key_name(named),
-            Key::Character(_) => key
-                .to_latin(physical_key)
-                .map(|value| value.to_string())
-                .or_else(|| match key.as_ref() {
-                    Key::Character(value) => Some(value.to_string()),
-                    _ => None,
-                }),
-            Key::Unidentified => None,
-        };
+        let expected = binding.normalized_key();
 
-        let Some(pressed) = pressed else {
-            return false;
-        };
-
-        normalize_binding_key(&pressed) == binding.normalized_key()
+        pressed_key_candidates(key, physical_key)
+            .into_iter()
+            .any(|pressed| pressed == expected)
     }
 }
 
-fn named_key_name(named: Named) -> Option<String> {
-    match named {
-        Named::Enter => Some("Enter".to_string()),
-        Named::ArrowDown => Some("ArrowDown".to_string()),
-        Named::ArrowUp => Some("ArrowUp".to_string()),
-        Named::ArrowLeft => Some("ArrowLeft".to_string()),
-        Named::ArrowRight => Some("ArrowRight".to_string()),
-        Named::Escape => Some("Escape".to_string()),
-        Named::Space => Some("Space".to_string()),
-        Named::Tab => Some("Tab".to_string()),
-        Named::Backspace => Some("Backspace".to_string()),
-        Named::Delete => Some("Delete".to_string()),
-        Named::Home => Some("Home".to_string()),
-        Named::End => Some("End".to_string()),
-        Named::PageUp => Some("PageUp".to_string()),
-        Named::PageDown => Some("PageDown".to_string()),
-        _ => None,
+fn pressed_key_candidates(key: &Key, physical_key: keyboard::key::Physical) -> Vec<String> {
+    let mut candidates = Vec::new();
+
+    match key.as_ref() {
+        Key::Named(named) => push_candidate(&mut candidates, format!("{named:?}")),
+        Key::Character(value) => push_candidate(&mut candidates, value.to_string()),
+        Key::Unidentified => {}
+    }
+
+    if let Some(value) = key.to_latin(physical_key) {
+        push_candidate(&mut candidates, value.to_string());
+    }
+
+    match physical_key {
+        keyboard::key::Physical::Code(code) => push_candidate(&mut candidates, format!("{code:?}")),
+        keyboard::key::Physical::Unidentified(native) => {
+            push_candidate(&mut candidates, format!("{native:?}"));
+            push_candidate(&mut candidates, format!("{physical_key:?}"));
+        }
+    }
+
+    candidates
+}
+
+fn push_candidate(candidates: &mut Vec<String>, value: String) {
+    let normalized = normalize_binding_key(&value);
+
+    if !normalized.is_empty() && !candidates.contains(&normalized) {
+        candidates.push(normalized);
     }
 }
 
@@ -313,6 +320,7 @@ mod tests {
     fn app(index: usize) -> DesktopApp {
         DesktopApp::new(
             format!("App {index}"),
+            "Application".to_string(),
             format!("/usr/bin/app-{index} %u"),
             format!("/usr/bin/app-{index}"),
             vec!["%u".to_string()],

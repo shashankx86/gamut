@@ -1,13 +1,13 @@
 use super::color_scheme::shared_color_scheme;
 use super::palette::{ResolvedAppearance, ThemePalette};
-use crate::core::assets::{AssetTheme, asset_theme};
-use crate::core::preferences::{AppearancePreferences, ThemePreference};
-use iced::Theme;
+use crate::core::assets::{asset_theme, AssetTheme};
+use crate::core::preferences::AppearancePreferences;
 use iced::theme::Palette;
+use iced::Theme;
 
 pub(crate) fn resolve_theme(preferences: &AppearancePreferences) -> Theme {
     let resolved = resolve_palette(preferences);
-    Theme::custom(theme_name(preferences.theme), resolved.palette)
+    Theme::custom(theme_name(preferences), resolved.palette)
 }
 
 pub(crate) fn resolve_appearance(preferences: &AppearancePreferences) -> ResolvedAppearance {
@@ -35,27 +35,31 @@ fn resolve_palette(preferences: &AppearancePreferences) -> ThemePalette {
     }
 }
 
-fn theme_name(preference: ThemePreference) -> &'static str {
-    match preference {
-        ThemePreference::Light => "Gamut Light",
-        ThemePreference::Dark => "Gamut Dark",
-        ThemePreference::System => "Gamut System",
-    }
+fn theme_name(preferences: &AppearancePreferences) -> String {
+    format!("Gamut {}", preferences.resolved_theme().name)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{resolve_appearance, resolve_theme};
-    use crate::core::preferences::{
-        AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
-    };
+    use crate::core::preferences::{AppearancePreferences, ThemePreference};
 
     #[test]
     fn invalid_scheme_falls_back_to_default_dark_palette() {
         let mut preferences = AppearancePreferences::default();
-        preferences.theme = ThemePreference::Dark;
-        *preferences.scheme_mut(ThemeSchemeId::Dark) =
-            ThemeColors::new("invalid", "#FFFFFF", "#3366FF");
+        preferences.theme = ThemePreference::Custom("night".to_string());
+        preferences
+            .upsert_custom_theme("night")
+            .expect("theme entry should exist")
+            .background = "invalid".to_string();
+        preferences
+            .upsert_custom_theme("night")
+            .expect("theme entry should exist")
+            .text = "#FFFFFF".to_string();
+        preferences
+            .upsert_custom_theme("night")
+            .expect("theme entry should exist")
+            .accent = "#3366FF".to_string();
 
         let theme = resolve_theme(&preferences);
         assert_eq!(

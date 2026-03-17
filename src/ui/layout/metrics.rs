@@ -211,23 +211,21 @@ fn size_scale(size: LauncherSize) -> f32 {
         LauncherSize::Small => 0.88,
         LauncherSize::Medium => 1.0,
         LauncherSize::Large => 1.12,
-        LauncherSize::ExtraLarge => 1.26,
     }
 }
 
 fn apply_radius_preferences(layout: &mut LauncherLayout, app_preferences: &AppPreferences) {
-    let custom = app_preferences.appearance.custom_radius.max(0.0);
     let panel_radius = match app_preferences.appearance.radius {
+        RadiusPreference::None => 0.0,
         RadiusPreference::Small => DEFAULT_PANEL_RADIUS,
         RadiusPreference::Medium => 16.0,
         RadiusPreference::Large => 22.0,
-        RadiusPreference::Custom => custom,
     };
     let item_radius = match app_preferences.appearance.radius {
+        RadiusPreference::None => 0.0,
         RadiusPreference::Small => DEFAULT_ITEM_RADIUS,
         RadiusPreference::Medium => 12.0,
         RadiusPreference::Large => 16.0,
-        RadiusPreference::Custom => (custom * 0.8).max(0.0),
     };
 
     layout.panel_radius = panel_radius;

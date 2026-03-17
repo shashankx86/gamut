@@ -13,12 +13,12 @@ struct ThemeSeed {
 pub(in crate::ui) fn shared_color_scheme(
     preferences: &AppearancePreferences,
 ) -> ResolvedAppearance {
-    let scheme_id = preferences.resolved_scheme();
-    let scheme = match scheme_id {
+    let resolved = preferences.resolved_theme();
+    let scheme = match resolved.variant {
         ThemeSchemeId::Light => ThemeScheme::Light,
         ThemeSchemeId::Dark => ThemeScheme::Dark,
     };
-    let seed = parse_seed(preferences.scheme(scheme_id)).unwrap_or_else(|| default_seed(scheme));
+    let seed = parse_seed(&resolved.colors).unwrap_or_else(|| default_seed(scheme));
 
     match scheme {
         ThemeScheme::Light => light_scheme(seed),

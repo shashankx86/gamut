@@ -5,19 +5,19 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RadiusPreference {
+    None,
     Small,
     Medium,
     Large,
-    Custom,
 }
 
 impl RadiusPreference {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::None => "none",
             Self::Small => "small",
             Self::Medium => "medium",
             Self::Large => "large",
-            Self::Custom => "custom",
         }
     }
 }
@@ -39,11 +39,11 @@ impl FromStr for RadiusPreference {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value.trim().to_ascii_lowercase().as_str() {
+            "none" => Ok(Self::None),
             "small" => Ok(Self::Small),
             "medium" => Ok(Self::Medium),
             "large" => Ok(Self::Large),
-            "custom" => Ok(Self::Custom),
-            _ => Err("expected one of: small, medium, large, custom".to_string()),
+            _ => Err("expected one of: none, small, medium, large".to_string()),
         }
     }
 }
@@ -71,7 +71,6 @@ pub enum LauncherSize {
     Small,
     Medium,
     Large,
-    ExtraLarge,
 }
 
 impl LauncherSize {
@@ -80,7 +79,6 @@ impl LauncherSize {
             Self::Small => "small",
             Self::Medium => "medium",
             Self::Large => "large",
-            Self::ExtraLarge => "extra_large",
         }
     }
 }
@@ -105,8 +103,7 @@ impl FromStr for LauncherSize {
             "small" => Ok(Self::Small),
             "medium" => Ok(Self::Medium),
             "large" => Ok(Self::Large),
-            "extra_large" | "extralarge" | "extra-large" => Ok(Self::ExtraLarge),
-            _ => Err("expected one of: small, medium, large, extra_large".to_string()),
+            _ => Err("expected one of: small, medium, large".to_string()),
         }
     }
 }

@@ -83,7 +83,7 @@ where
     match args[0].as_str() {
         "config" => parse_config_command(&args[1..]),
         "help" => parse_help_command(&args[1..]),
-        _ => parse_legacy_mode_command(&args),
+        _ => parse_mode_command(&args),
     }
 }
 
@@ -104,7 +104,7 @@ fn parse_help_command(args: &[String]) -> Result<CliCommand, CliError> {
     }
 }
 
-fn parse_legacy_mode_command(args: &[String]) -> Result<CliCommand, CliError> {
+fn parse_mode_command(args: &[String]) -> Result<CliCommand, CliError> {
     if args
         .iter()
         .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
@@ -123,9 +123,9 @@ fn parse_legacy_mode_command(args: &[String]) -> Result<CliCommand, CliError> {
 
     for arg in args {
         match arg.as_str() {
-            "--daemon" | "daemon" => mode = CliMode::Daemon,
-            "--quit" | "quit" => mode = CliMode::Quit,
-            "--toggle" | "toggle" => mode = CliMode::Toggle,
+            "daemon" => mode = CliMode::Daemon,
+            "quit" => mode = CliMode::Quit,
+            "toggle" => mode = CliMode::Toggle,
             value if value.starts_with('-') => {
                 return Err(CliError::new(
                     format!("unknown option `{value}`"),
@@ -378,7 +378,7 @@ fn shortcut_help_topic(value: &str) -> Result<HelpTopic, CliError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CliCommand, CliError, CliMode, HelpTopic, parse_command};
+    use super::{parse_command, CliCommand, CliError, CliMode, HelpTopic};
     use crate::core::preferences::{
         ConfigCommand, ConfigKey, ConfigResetTarget, ShortcutAction, ShortcutConfigCommand,
     };
@@ -397,9 +397,9 @@ mod tests {
     }
 
     #[test]
-    fn parses_legacy_modes() {
+    fn parses_modes() {
         assert_eq!(
-            parse(&["--daemon"]).expect("daemon should parse"),
+            parse(&["daemon"]).expect("daemon should parse"),
             CliCommand::Run(CliMode::Daemon)
         );
         assert_eq!(

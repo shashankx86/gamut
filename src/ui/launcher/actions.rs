@@ -1,7 +1,7 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use iced::{Task, window};
+use iced::{window, Task};
 use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -39,7 +39,10 @@ impl Launcher {
         self.is_visible = true;
         self.arm_unfocus_guard();
 
-        self.recreate_launcher_surface()
+        Task::batch(vec![
+            self.request_app_refresh(true),
+            self.recreate_launcher_surface(),
+        ])
     }
 
     pub(super) fn hide_launcher(&mut self) -> Task<Message> {

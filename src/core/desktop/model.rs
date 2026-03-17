@@ -3,6 +3,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DesktopApp {
     pub name: String,
+    pub entry_type: String,
     pub exec_line: String,
     pub command: String,
     pub args: Vec<String>,
@@ -26,6 +27,7 @@ pub struct IconResolveRequest {
 impl DesktopApp {
     pub fn new(
         name: String,
+        entry_type: String,
         exec_line: String,
         command: String,
         args: Vec<String>,
@@ -43,6 +45,7 @@ impl DesktopApp {
 
         Self {
             name,
+            entry_type,
             exec_line,
             command,
             args,
@@ -104,12 +107,13 @@ pub fn trim_label(value: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{DesktopApp, normalize_query, trim_label};
+    use super::{normalize_query, trim_label, DesktopApp};
 
     #[test]
     fn query_matching_is_case_insensitive() {
         let app = DesktopApp::new(
             "Firefox".to_string(),
+            "Application".to_string(),
             "/usr/bin/firefox --new-window".to_string(),
             "/usr/bin/firefox".to_string(),
             vec!["--new-window".to_string()],
@@ -131,6 +135,7 @@ mod tests {
     fn name_prefix_beats_exec_path_match() {
         let resolve = DesktopApp::new(
             "DaVinci Resolve".to_string(),
+            "Application".to_string(),
             "/opt/resolve/bin/resolve %u".to_string(),
             "/opt/resolve/bin/resolve".to_string(),
             vec!["%u".to_string()],
@@ -140,6 +145,7 @@ mod tests {
         );
         let raw_player = DesktopApp::new(
             "Blackmagic RAW Player".to_string(),
+            "Application".to_string(),
             "/opt/resolve/BlackmagicRAWPlayer/BlackmagicRAWPlayer %f".to_string(),
             "/opt/resolve/BlackmagicRAWPlayer/BlackmagicRAWPlayer".to_string(),
             vec!["%f".to_string()],
@@ -159,6 +165,7 @@ mod tests {
     fn shorter_prefix_match_scores_higher() {
         let resolve = DesktopApp::new(
             "DaVinci Resolve".to_string(),
+            "Application".to_string(),
             "/opt/resolve/bin/resolve %u".to_string(),
             "/opt/resolve/bin/resolve".to_string(),
             vec!["%u".to_string()],
@@ -168,6 +175,7 @@ mod tests {
         );
         let control_panels = DesktopApp::new(
             "DaVinci Control Panels Setup".to_string(),
+            "Application".to_string(),
             "/opt/resolve/DaVinci Control Panels Setup/DaVinci Control".to_string(),
             "/opt/resolve/DaVinci Control Panels Setup/DaVinci Control".to_string(),
             Vec::new(),

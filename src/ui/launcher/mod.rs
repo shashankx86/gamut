@@ -31,12 +31,14 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 pub(in crate::ui) use state::{render_range_for_viewport, spacer_height_for_rows};
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
 const APP_SEARCH_SUBSCRIPTION_ID: u64 = IPC_SUBSCRIPTION_ID + 2;
+const APP_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -132,6 +134,8 @@ pub(super) struct Launcher {
     tray_controller: TrayController,
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
+    app_refresh_in_flight: bool,
+    last_app_refresh_at: Option<Instant>,
     app_search_engine: ApplicationSearchEngine,
     search_results_handle: SearchResultsReceiverHandle,
     ipc_handle: IpcReceiverHandle,
@@ -169,6 +173,11 @@ pub(super) enum Message {
 }
 
 impl Launcher {
+    #[cfg(test)]
+    pub(super) fn app_refresh_in_flight(&self) -> bool {
+        self.app_refresh_in_flight
+    }
+
     pub(super) fn new(
         command_receiver: Receiver<AppCommand>,
         tray_controller: TrayController,
@@ -233,6 +242,8 @@ impl Launcher {
             tray_controller,
             modifiers: Modifiers::default(),
             icon_resolve_in_flight: false,
+            app_refresh_in_flight: false,
+            last_app_refresh_at: None,
             app_search_engine,
             search_results_handle: SearchResultsReceiverHandle::new(search_results_receiver),
             ipc_handle,
@@ -351,6 +362,23 @@ impl Launcher {
         )
     }
 
+    pub(super) fn request_app_refresh(&mut self, force: bool) -> Task<Message> {
+        if self.app_refresh_in_flight {
+            return Task::none();
+        }
+
+        if !force
+            && self
+                .last_app_refresh_at
+                .is_some_and(|at| at.elapsed() < APP_REFRESH_INTERVAL)
+        {
+            return Task::none();
+        }
+
+        self.app_refresh_in_flight = true;
+        Task::perform(async { refresh_app_cache() }, Message::AppsLoaded)
+    }
+
     pub(super) fn apply_resolved_icons(&mut self, updates: Vec<(usize, Option<PathBuf>)>) {
         let mut changed = false;
 
@@ -369,6 +397,11 @@ impl Launcher {
         }
 
         self.icon_resolve_in_flight = false;
+    }
+
+    pub(super) fn finish_app_refresh(&mut self) {
+        self.app_refresh_in_flight = false;
+        self.last_app_refresh_at = Some(Instant::now());
     }
 
     pub(super) fn ipc_handle(&self) -> IpcReceiverHandle {

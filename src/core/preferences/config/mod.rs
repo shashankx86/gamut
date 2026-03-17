@@ -5,10 +5,11 @@ pub use key::ConfigKey;
 
 use super::{
     AppPreferences, LauncherPlacement, LauncherSize, RadiusPreference, ShortcutAction,
-    ShortcutBinding, ShortcutPreferences, ThemePreference, ThemeSchemeId, config_path,
+    ShortcutBinding, ShortcutPreferences, ThemeColors, ThemePreference, config_path,
     load_preferences, save_preferences,
 };
 use crate::core::ipc::{IpcCommand, send_command};
+use crate::core::theme::default_custom_theme_colors;
 use std::error::Error;
 use std::io;
 
@@ -148,34 +149,22 @@ fn show_preferences() {
     println!("[appearance]");
     println!("theme = {}", preferences.appearance.theme);
     println!("radius = {}", preferences.appearance.radius);
-    println!(
-        "custom_radius = {}",
-        trim_float(preferences.appearance.custom_radius)
-    );
-    println!(
-        "schemes.light.background = {}",
-        preferences.appearance.schemes.light.background
-    );
-    println!(
-        "schemes.light.text = {}",
-        preferences.appearance.schemes.light.text
-    );
-    println!(
-        "schemes.light.accent = {}",
-        preferences.appearance.schemes.light.accent
-    );
-    println!(
-        "schemes.dark.background = {}",
-        preferences.appearance.schemes.dark.background
-    );
-    println!(
-        "schemes.dark.text = {}",
-        preferences.appearance.schemes.dark.text
-    );
-    println!(
-        "schemes.dark.accent = {}",
-        preferences.appearance.schemes.dark.accent
-    );
+        let active_theme = active_theme_colors(&preferences);
+        println!("theme.background = {}", active_theme.background);
+        println!("theme.text = {}", active_theme.text);
+        println!("theme.accent = {}", active_theme.accent);
+
+        if !preferences.appearance.themes.is_empty() {
+            println!();
+            for (name, colors) in &preferences.appearance.themes {
+                println!("[appearance.themes.{name}]");
+                println!("background = {}", colors.background);
+            println!("text = {}", colors.text);
+            println!("accent = {}", colors.accent);
+            println!();
+        }
+    }
+
     println!();
     println!("[layout]");
     println!("size = {}", preferences.layout.size);
@@ -256,17 +245,9 @@ impl ConfigKey {
         match self {
             Self::AppearanceTheme => preferences.appearance.theme.to_string(),
             Self::AppearanceRadius => preferences.appearance.radius.to_string(),
-            Self::AppearanceCustomRadius => trim_float(preferences.appearance.custom_radius),
-            Self::AppearanceLightBackground => {
-                preferences.appearance.schemes.light.background.clone()
-            }
-            Self::AppearanceLightText => preferences.appearance.schemes.light.text.clone(),
-            Self::AppearanceLightAccent => preferences.appearance.schemes.light.accent.clone(),
-            Self::AppearanceDarkBackground => {
-                preferences.appearance.schemes.dark.background.clone()
-            }
-            Self::AppearanceDarkText => preferences.appearance.schemes.dark.text.clone(),
-            Self::AppearanceDarkAccent => preferences.appearance.schemes.dark.accent.clone(),
+            Self::AppearanceThemeBackground => active_theme_colors(preferences).background,
+            Self::AppearanceThemeText => active_theme_colors(preferences).text,
+            Self::AppearanceThemeAccent => active_theme_colors(preferences).accent,
             Self::LayoutSize => preferences.layout.size.to_string(),
             Self::LayoutPlacement => preferences.layout.placement.to_string(),
             Self::LayoutCustomTopMargin => trim_float(preferences.layout.custom_top_margin),
@@ -279,43 +260,22 @@ impl ConfigKey {
         match self {
             Self::AppearanceTheme => {
                 preferences.appearance.theme = value.parse::<ThemePreference>()?;
+
+                if let ThemePreference::Custom(name) = preferences.appearance.theme.clone() {
+                    preferences.appearance.upsert_custom_theme(&name)?;
+                }
             }
             Self::AppearanceRadius => {
                 preferences.appearance.radius = value.parse::<RadiusPreference>()?;
             }
-            Self::AppearanceCustomRadius => {
-                preferences.appearance.custom_radius =
-                    parse_non_negative_f32(value, "appearance.custom_radius")?;
+            Self::AppearanceThemeBackground => {
+                selected_custom_theme_mut(preferences)?.background = parse_color(value)?;
             }
-            Self::AppearanceLightBackground => {
-                preferences
-                    .appearance
-                    .scheme_mut(ThemeSchemeId::Light)
-                    .background = parse_color(value)?;
+            Self::AppearanceThemeText => {
+                selected_custom_theme_mut(preferences)?.text = parse_color(value)?;
             }
-            Self::AppearanceLightText => {
-                preferences.appearance.scheme_mut(ThemeSchemeId::Light).text = parse_color(value)?;
-            }
-            Self::AppearanceLightAccent => {
-                preferences
-                    .appearance
-                    .scheme_mut(ThemeSchemeId::Light)
-                    .accent = parse_color(value)?;
-            }
-            Self::AppearanceDarkBackground => {
-                preferences
-                    .appearance
-                    .scheme_mut(ThemeSchemeId::Dark)
-                    .background = parse_color(value)?;
-            }
-            Self::AppearanceDarkText => {
-                preferences.appearance.scheme_mut(ThemeSchemeId::Dark).text = parse_color(value)?;
-            }
-            Self::AppearanceDarkAccent => {
-                preferences
-                    .appearance
-                    .scheme_mut(ThemeSchemeId::Dark)
-                    .accent = parse_color(value)?;
+            Self::AppearanceThemeAccent => {
+                selected_custom_theme_mut(preferences)?.accent = parse_color(value)?;
             }
             Self::LayoutSize => {
                 preferences.layout.size = value.parse::<LauncherSize>()?;
@@ -346,30 +306,20 @@ impl ConfigKey {
         match self {
             Self::AppearanceTheme => preferences.appearance.theme = defaults.appearance.theme,
             Self::AppearanceRadius => preferences.appearance.radius = defaults.appearance.radius,
-            Self::AppearanceCustomRadius => {
-                preferences.appearance.custom_radius = defaults.appearance.custom_radius;
+            Self::AppearanceThemeBackground => {
+                if let Ok(theme) = selected_custom_theme_mut(preferences) {
+                    theme.background = default_custom_theme_colors().background;
+                }
             }
-            Self::AppearanceLightBackground => {
-                preferences.appearance.schemes.light.background =
-                    defaults.appearance.schemes.light.background;
+            Self::AppearanceThemeText => {
+                if let Ok(theme) = selected_custom_theme_mut(preferences) {
+                    theme.text = default_custom_theme_colors().text;
+                }
             }
-            Self::AppearanceLightText => {
-                preferences.appearance.schemes.light.text = defaults.appearance.schemes.light.text;
-            }
-            Self::AppearanceLightAccent => {
-                preferences.appearance.schemes.light.accent =
-                    defaults.appearance.schemes.light.accent;
-            }
-            Self::AppearanceDarkBackground => {
-                preferences.appearance.schemes.dark.background =
-                    defaults.appearance.schemes.dark.background;
-            }
-            Self::AppearanceDarkText => {
-                preferences.appearance.schemes.dark.text = defaults.appearance.schemes.dark.text;
-            }
-            Self::AppearanceDarkAccent => {
-                preferences.appearance.schemes.dark.accent =
-                    defaults.appearance.schemes.dark.accent;
+            Self::AppearanceThemeAccent => {
+                if let Ok(theme) = selected_custom_theme_mut(preferences) {
+                    theme.accent = default_custom_theme_colors().accent;
+                }
             }
             Self::LayoutSize => preferences.layout.size = defaults.layout.size,
             Self::LayoutPlacement => preferences.layout.placement = defaults.layout.placement,
@@ -381,13 +331,28 @@ impl ConfigKey {
                 preferences
                     .shortcuts
                     .update_binding(action, binding)
-                    .expect("default shortcut bindings should be unique");
+                    .expect("default shortcut binding should apply");
             }
             Self::SystemStartAtLogin => {
                 preferences.system.start_at_login = defaults.system.start_at_login;
             }
         }
     }
+}
+
+fn active_theme_colors(preferences: &AppPreferences) -> ThemeColors {
+    preferences.appearance.resolved_theme().colors
+}
+
+fn selected_custom_theme_mut(preferences: &mut AppPreferences) -> Result<&mut ThemeColors, String> {
+    let ThemePreference::Custom(name) = preferences.appearance.theme.clone() else {
+        return Err(
+            "appearance.theme colors can only be changed for a custom theme; set appearance.theme to a name like `orange` first"
+                .to_string(),
+        );
+    };
+
+    preferences.appearance.upsert_custom_theme(&name)
 }
 
 fn parse_color(value: &str) -> Result<String, String> {
@@ -422,5 +387,16 @@ mod tests {
             .expect("shortcut should update");
 
         assert_eq!(preferences.shortcuts.move_up.to_string(), "Ctrl+K");
+    }
+
+    #[test]
+    fn setting_custom_theme_creates_theme_entry() {
+        let mut preferences = AppPreferences::default();
+
+        ConfigKey::AppearanceTheme
+            .set_value(&mut preferences, "orange")
+            .expect("theme should update");
+
+        assert!(preferences.appearance.themes.contains_key("orange"));
     }
 }

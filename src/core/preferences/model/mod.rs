@@ -4,7 +4,7 @@ mod shortcuts;
 mod system;
 
 pub use appearance::{
-    AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
+    normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
 };
 pub use layout::{LauncherPlacement, LauncherSize, LayoutPreferences, RadiusPreference};
 pub use shortcuts::{ShortcutAction, ShortcutBinding, ShortcutPreferences};
@@ -83,8 +83,8 @@ mod tests {
     #[test]
     fn shortcut_action_parses_cli_name() {
         assert_eq!(
-            ShortcutAction::from_str("expand-or-move-down").expect("action should parse"),
-            ShortcutAction::ExpandOrMoveDown,
+            ShortcutAction::from_str("move-down").expect("action should parse"),
+            ShortcutAction::MoveDown,
         );
     }
 }

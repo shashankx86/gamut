@@ -6,12 +6,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const CONFIG_FILE: &str = "config.toml";
-const LEGACY_CONFIG_FILE: &str = "preferences.toml";
 
 pub fn load_preferences() -> AppPreferences {
-    load_preferences_from_path(&config_path())
-        .or_else(|_| load_preferences_from_path(&legacy_config_path()))
-        .unwrap_or_default()
+    load_or_create_preferences_at_path(&config_path())
 }
 
 pub fn save_preferences(preferences: &AppPreferences) -> io::Result<()> {
@@ -23,13 +20,28 @@ pub fn config_path() -> PathBuf {
     app_config_path(CONFIG_FILE)
 }
 
-fn legacy_config_path() -> PathBuf {
-    app_config_path(LEGACY_CONFIG_FILE)
-}
-
 fn load_preferences_from_path(path: &Path) -> io::Result<AppPreferences> {
     let contents = fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(io::Error::other)
+}
+
+fn load_or_create_preferences_at_path(path: &Path) -> AppPreferences {
+    match load_preferences_from_path(path) {
+        Ok(preferences) => preferences,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let preferences = AppPreferences::default();
+
+            if let Err(save_error) = save_preferences_to_path(&preferences, path) {
+                eprintln!(
+                    "warning: could not create default config at {}: {save_error}",
+                    path.display()
+                );
+            }
+
+            preferences
+        }
+        Err(_) => AppPreferences::default(),
+    }
 }
 
 fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Result<()> {
@@ -40,7 +52,8 @@ fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Re
 #[cfg(test)]
 mod tests {
     use super::{
-        AppPreferences, config_path, load_preferences_from_path, save_preferences_to_path,
+        config_path, load_or_create_preferences_at_path, load_preferences_from_path,
+        save_preferences_to_path, AppPreferences,
     };
     use std::fs;
     use std::path::PathBuf;
@@ -84,13 +97,29 @@ mod tests {
         first.system.start_at_login = true;
 
         let mut second = AppPreferences::default();
-        second.appearance.custom_radius = 24.0;
+        second.layout.custom_top_margin = 96.0;
 
         save_preferences_to_path(&first, &path).expect("should write first preferences");
         save_preferences_to_path(&second, &path).expect("should replace preferences");
 
         let loaded = load_preferences_from_path(&path).expect("should load replaced preferences");
         assert_eq!(loaded, second);
+
+        let _ = fs::remove_file(&path);
+        if let Some(parent) = path.parent() {
+            let _ = fs::remove_dir_all(parent);
+        }
+    }
+
+    #[test]
+    fn load_creates_default_config_when_missing() {
+        let path = unique_path();
+
+        let loaded = load_or_create_preferences_at_path(&path);
+        let saved = load_preferences_from_path(&path).expect("should create config file");
+
+        assert_eq!(loaded, AppPreferences::default());
+        assert_eq!(saved, AppPreferences::default());
 
         let _ = fs::remove_file(&path);
         if let Some(parent) = path.parent() {

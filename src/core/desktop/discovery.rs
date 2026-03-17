@@ -1,9 +1,9 @@
 use super::icons::resolve_app_icon;
 use super::model::{DesktopApp, IconResolveRequest};
 use freedesktop_desktop_entry::{
-    DesktopEntry, Iter, PathSource, default_paths, get_languages_from_env,
+    default_paths, get_languages_from_env, DesktopEntry, Iter, PathSource,
 };
-use std::collections::{HashMap, hash_map::Entry};
+use std::collections::{hash_map::Entry, HashMap};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -73,6 +73,7 @@ fn is_launchable_entry(entry: &DesktopEntry) -> bool {
 
 fn parse_desktop_app(entry: &DesktopEntry, locales: &[String]) -> Option<DesktopApp> {
     let name = entry.name(locales).map(|value| value.to_string())?;
+    let entry_type = entry.type_().unwrap_or("Application").to_string();
     let exec_line = entry.exec().map(|value| value.to_string())?;
     let (command, args) = parse_exec_command(entry)?;
 
@@ -93,6 +94,7 @@ fn parse_desktop_app(entry: &DesktopEntry, locales: &[String]) -> Option<Desktop
 
     Some(DesktopApp::new(
         name,
+        entry_type,
         exec_line,
         command,
         args,
@@ -167,11 +169,12 @@ fn canonical_name_for_dedupe(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{DesktopApp, ScoredApp, dedupe_key, should_replace_existing};
+    use super::{dedupe_key, should_replace_existing, DesktopApp, ScoredApp};
 
     fn app(name: &str, command: &str, exec_line: &str, args: Vec<&str>) -> DesktopApp {
         DesktopApp::new(
             name.to_string(),
+            "Application".to_string(),
             exec_line.to_string(),
             command.to_string(),
             args.into_iter().map(str::to_string).collect(),

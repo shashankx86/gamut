@@ -15,14 +15,14 @@ const ASCII_ART: &str = r"
 
 pub fn help_text() -> String {
     format!(
-        "{ASCII_ART}\n\nUsage:\n  {name} [OPTIONS] [COMMAND]\n\nCommands:\n  config                Manage launcher configuration from the CLI\n  toggle                Toggle the launcher (default)\n  daemon                Run the daemon process\n  quit                  Ask the running daemon to quit\n  help [COMMAND]        Show help for a command\n\nOptions:\n  -h, --help            Show this help message\n  -v, --version         Show version\n\nNotes:\n  `--toggle`, `--daemon`, and `--quit` remain supported as legacy flags.\n\nRun `{name} help config` for configuration help.\n",
+        "{ASCII_ART}\n\nUsage:\n  {name} [OPTIONS] [COMMAND]\n\nCommands:\n  config                Manage launcher configuration from the CLI\n  toggle                Toggle the launcher (default)\n  daemon                Run the daemon process\n  quit                  Ask the running daemon to quit\n  help [COMMAND]        Show help for a command\n\nOptions:\n  -h, --help            Show this help message\n  -v, --version         Show version\n\nRun `{name} help config` for configuration help.\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }
 
 pub fn config_help_text() -> String {
     format!(
-        "Usage:\n  {name} config <SUBCOMMAND>\n\nSubcommands:\n  show                              Print the active configuration\n  path                              Print the configuration file path\n  keys                              List all supported config keys\n  get <key>                         Read a single config value\n  set <key> <value>                 Update a single config value\n  reset <key>|all                   Reset one key or the full config\n  shortcut <SUBCOMMAND>             Manage keyboard shortcuts\n\nExamples:\n  {name} config show\n  {name} config get appearance.theme\n  {name} config set layout.size large\n  {name} config set system.start_at_login true\n  {name} config reset appearance.schemes.dark.accent\n  {name} config reset all\n\nHelp:\n  {name} help config show\n  {name} help config get\n  {name} help config set\n  {name} help config reset\n  {name} help config shortcut\n",
+        "Usage:\n  {name} config <SUBCOMMAND>\n\nSubcommands:\n  show                              Print the active configuration\n  path                              Print the configuration file path\n  keys                              List all supported config keys\n  get <key>                         Read a single config value\n  set <key> <value>                 Update a single config value\n  reset <key>|all                   Reset one key or the full config\n  shortcut <SUBCOMMAND>             Manage keyboard shortcuts\n\nExamples:\n  {name} config show\n  {name} config get appearance.theme\n  {name} config set appearance.theme orange\n  {name} config set appearance.theme.accent '#FF7A00'\n  {name} config reset all\n\nHelp:\n  {name} help config show\n  {name} help config get\n  {name} help config set\n  {name} help config reset\n  {name} help config shortcut\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }
@@ -57,7 +57,7 @@ pub fn config_get_help_text() -> String {
 
 pub fn config_set_help_text() -> String {
     format!(
-        "Usage:\n  {name} config set <key> <value>\n\nUpdate one config value.\n\nExamples:\n  {name} config set appearance.theme dark\n  {name} config set layout.custom_top_margin 96\n  {name} config set system.start_at_login true\n",
+        "Usage:\n  {name} config set <key> <value>\n\nUpdate one config value.\n\nExamples:\n  {name} config set appearance.theme dark\n  {name} config set appearance.theme orange\n  {name} config set appearance.theme.background '#FFF4E8'\n  {name} config set layout.custom_top_margin 96\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }
@@ -71,7 +71,7 @@ pub fn config_reset_help_text() -> String {
 
 pub fn shortcut_help_text() -> String {
     format!(
-        "Usage:\n  {name} config shortcut <SUBCOMMAND>\n\nSubcommands:\n  list                                      Show current shortcut bindings\n  set <action> <binding>                    Set a shortcut directly\n  interactive [action]                      Capture a shortcut from live key presses\n\nActions:\n  launch-selected\n  expand-or-move-down\n  move-up\n  close-launcher\n\nBinding format:\n  Use `Modifier+Key`, for example `Ctrl+K`, `Alt+Space`, `Shift+Enter`, `Super+Slash`.\n\nHelp:\n  {name} help config shortcut list\n  {name} help config shortcut set\n  {name} help config shortcut interactive\n",
+        "Usage:\n  {name} config shortcut <SUBCOMMAND>\n\nSubcommands:\n  list                                      Show current shortcut bindings\n  set <action> <binding>                    Set a shortcut directly\n  interactive [action]                      Capture a shortcut from live key presses\n\nActions:\n  launch-selected\n  expand\n  move-down\n  move-up\n  close-launcher\n\nBinding format:\n  Use `Modifier+Key`, for example `Ctrl+K`, `Alt+Space`, `Shift+Enter`, `Super+Slash`. Duplicate bindings are allowed.\n\nHelp:\n  {name} help config shortcut list\n  {name} help config shortcut set\n  {name} help config shortcut interactive\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }
