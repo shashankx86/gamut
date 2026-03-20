@@ -1,6 +1,6 @@
 use super::receiver::{app_command_stream, ipc_command_stream, search_results_stream};
 use super::{Launcher, Message};
-use iced::{event, time, window, Event, Subscription};
+use iced::{Event, Subscription, event, time, window};
 use std::time::Duration;
 
 const ACTIVE_TICK_MS: u64 = 25;

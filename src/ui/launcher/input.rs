@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
 use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{window, Task};
+use iced::{Task, window};
 
 impl Launcher {
     pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
@@ -181,7 +181,7 @@ impl Launcher {
             total_rows,
             self.layout.result_row_height,
             self.layout.result_row_gap,
-            self.layout.result_row_inset_y + 1.0,
+            self.layout.result_row_inset_y,
         );
         self.results_scroll_offset = target_offset;
         self.scroll_start_rank = super::state::scroll_start_for_offset(

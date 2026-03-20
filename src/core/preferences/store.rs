@@ -52,8 +52,8 @@ fn save_preferences_to_path(preferences: &AppPreferences, path: &Path) -> io::Re
 #[cfg(test)]
 mod tests {
     use super::{
-        config_path, load_or_create_preferences_at_path, load_preferences_from_path,
-        save_preferences_to_path, AppPreferences,
+        AppPreferences, config_path, load_or_create_preferences_at_path,
+        load_preferences_from_path, save_preferences_to_path,
     };
     use std::fs;
     use std::path::PathBuf;

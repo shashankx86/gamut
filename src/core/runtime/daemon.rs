@@ -1,4 +1,4 @@
-use super::{DynError, DAEMON_START_DELAY, DAEMON_START_RETRIES};
+use super::{DAEMON_START_DELAY, DAEMON_START_RETRIES, DynError};
 use crate::core::ipc::{self, IpcCommand};
 use crate::core::preferences::load_preferences;
 use crate::core::tray;

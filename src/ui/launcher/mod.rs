@@ -330,7 +330,7 @@ impl Launcher {
     }
 
     pub(super) fn needs_fast_tick(&self) -> bool {
-        self.is_visible && (self.results_target - self.results_progress).abs() > 0.01
+        self.is_visible && (self.results_target - self.results_progress).abs() > f32::EPSILON
     }
 
     pub(super) fn request_icon_resolution_for_visible(&mut self) -> Task<Message> {

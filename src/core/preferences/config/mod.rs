@@ -149,16 +149,16 @@ fn show_preferences() {
     println!("[appearance]");
     println!("theme = {}", preferences.appearance.theme);
     println!("radius = {}", preferences.appearance.radius);
-        let active_theme = active_theme_colors(&preferences);
-        println!("theme.background = {}", active_theme.background);
-        println!("theme.text = {}", active_theme.text);
-        println!("theme.accent = {}", active_theme.accent);
+    let active_theme = active_theme_colors(&preferences);
+    println!("theme.background = {}", active_theme.background);
+    println!("theme.text = {}", active_theme.text);
+    println!("theme.accent = {}", active_theme.accent);
 
-        if !preferences.appearance.themes.is_empty() {
-            println!();
-            for (name, colors) in &preferences.appearance.themes {
-                println!("[appearance.themes.{name}]");
-                println!("background = {}", colors.background);
+    if !preferences.appearance.themes.is_empty() {
+        println!();
+        for (name, colors) in &preferences.appearance.themes {
+            println!("[appearance.themes.{name}]");
+            println!("background = {}", colors.background);
             println!("text = {}", colors.text);
             println!("accent = {}", colors.accent);
             println!();

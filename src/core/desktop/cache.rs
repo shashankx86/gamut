@@ -214,8 +214,8 @@ impl From<DesktopApp> for CachedDesktopApp {
 #[cfg(test)]
 mod tests {
     use super::{
-        current_timestamp_secs, load_cached_apps_from_path, save_cached_apps_to_path,
-        CachedAppCatalog, APP_CACHE_FORMAT_VERSION,
+        APP_CACHE_FORMAT_VERSION, CachedAppCatalog, current_timestamp_secs,
+        load_cached_apps_from_path, save_cached_apps_to_path,
     };
     use crate::core::desktop::DesktopApp;
     use bincode::Options;

@@ -265,8 +265,8 @@ fn system_theme(mode: SystemThemeMode) -> ThemeSchemeId {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_custom_theme_name, normalize_hex_color, AppearancePreferences, ThemeColors,
-        ThemePreference, ThemeSchemeId,
+        AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
+        normalize_custom_theme_name, normalize_hex_color,
     };
     use dark_light::Mode as SystemThemeMode;
     use std::str::FromStr;

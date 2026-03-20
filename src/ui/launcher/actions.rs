@@ -1,7 +1,7 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use iced::{window, Task};
+use iced::{Task, window};
 use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};

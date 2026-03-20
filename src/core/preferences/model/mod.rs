@@ -4,7 +4,7 @@ mod shortcuts;
 mod system;
 
 pub use appearance::{
-    normalize_hex_color, AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId,
+    AppearancePreferences, ThemeColors, ThemePreference, ThemeSchemeId, normalize_hex_color,
 };
 pub use layout::{LauncherPlacement, LauncherSize, LayoutPreferences, RadiusPreference};
 pub use shortcuts::{ShortcutAction, ShortcutBinding, ShortcutPreferences};
