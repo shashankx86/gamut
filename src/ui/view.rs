@@ -3,12 +3,12 @@ use super::styles::{
     backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
     results_scroll_style, search_input_style,
 };
-use crate::core::desktop::{DesktopApp, trim_label};
+use crate::core::desktop::{trim_label, DesktopApp};
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{ContentFit, Element, Length, window};
+use iced::{window, ContentFit, Element, Length};
 use iced_shadcn::{
-    ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
-    Theme as ShadcnTheme, icon_button,
+    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme,
 };
 use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
@@ -156,7 +156,7 @@ impl Launcher {
                 iced::widget::scrollable::Scrollbar::new()
                     .width(10)
                     .scroller_width(6)
-                    .spacing(4),
+                    .spacing(2),
             ))
             .style(move |theme, status| results_scroll_style(theme, &appearance, status));
 

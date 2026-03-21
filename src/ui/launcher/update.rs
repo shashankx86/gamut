@@ -16,10 +16,7 @@ impl Launcher {
             }
             Message::SearchResultsLoaded(response) => {
                 if self.apply_search_results(response) {
-                    Task::batch(vec![
-                        self.scroll_to_selected(self.selected_rank, true),
-                        self.request_icon_resolution_for_visible(),
-                    ])
+                    self.request_icon_resolution_for_visible()
                 } else {
                     Task::none()
                 }
@@ -103,6 +100,7 @@ mod tests {
     use super::*;
     use crate::core::app_command::AppCommand;
     use crate::core::desktop::DesktopApp;
+    use crate::core::search::ApplicationSearchResponse;
     use std::sync::mpsc;
 
     fn launcher() -> Launcher {
@@ -135,5 +133,19 @@ mod tests {
 
         assert!(!launcher.app_refresh_in_flight());
         assert_eq!(launcher.app_count(), 1);
+    }
+
+    #[test]
+    fn search_results_do_not_force_scroll_back_to_selection() {
+        let mut launcher = launcher();
+        launcher.set_apps((0..20).map(|index| app(&format!("app-{index}"))).collect());
+        launcher.results_scroll_offset = 232.0;
+
+        let _ = launcher.update(Message::SearchResultsLoaded(ApplicationSearchResponse {
+            generation: 0,
+            matches: (0..20).collect(),
+        }));
+
+        assert_eq!(launcher.results_scroll_offset, 232.0);
     }
 }
