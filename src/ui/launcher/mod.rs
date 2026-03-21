@@ -15,7 +15,6 @@ use crate::core::desktop::{
     DesktopApp, IconResolveRequest, load_cached_app_catalog, refresh_app_cache,
     resolve_icon_requests, save_cached_apps,
 };
-use crate::core::display::OutputTarget;
 use crate::core::ipc::{IpcCommand, start_listener};
 use crate::core::preferences::{AppPreferences, load_preferences};
 use crate::core::search::{ApplicationSearchEngine, ApplicationSearchResponse};
@@ -113,7 +112,7 @@ pub(super) struct Launcher {
     pub(super) results_scroll_id: widget::Id,
     pub(super) launcher_window_id: Option<window::Id>,
     pub(super) monitor_size: Option<Size>,
-    pub(super) target_output: Option<OutputTarget>,
+    pub(super) target_output: Option<String>,
     pub(super) is_visible: bool,
     pub(super) ignore_unfocus_until: Option<std::time::Instant>,
     pub(super) selected_rank: usize,

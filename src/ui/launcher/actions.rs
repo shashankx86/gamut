@@ -74,9 +74,7 @@ impl Launcher {
                 launcher_visible_surface_settings(
                     &self.layout,
                     self.results_progress > 0.0 || self.results_target > 0.0,
-                    self.target_output
-                        .as_ref()
-                        .map(|target| target.name.as_str()),
+                    self.target_output.as_deref(),
                 )
             } else {
                 launcher_visible_surface_settings(&self.layout, false, None)
