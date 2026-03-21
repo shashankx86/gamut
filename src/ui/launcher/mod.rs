@@ -1,5 +1,6 @@
 mod actions;
 mod input;
+mod progress;
 mod receiver;
 mod search;
 mod state;
@@ -26,6 +27,9 @@ use iced::widget::{self, scrollable};
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
 use log::warn;
+use progress::{
+    ProgressConfig, ProgressContext, ProgressIndicator, ProgressIndicatorMode, ProgressSegments,
+};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
@@ -38,6 +42,7 @@ const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
 const APP_SEARCH_SUBSCRIPTION_ID: u64 = IPC_SUBSCRIPTION_ID + 2;
 const APP_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
+const PROGRESS_CONFIG: ProgressConfig = ProgressConfig::expansion_indeterminate_slow();
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -127,6 +132,8 @@ pub(super) struct Launcher {
     pub(super) results_progress: f32,
     pub(super) results_target: f32,
     pub(super) manually_expanded: bool,
+    progress_config: ProgressConfig,
+    progress_indicator: ProgressIndicator,
     layout_preferences: LauncherPreferences,
     pub(super) app_preferences: AppPreferences,
     visual_cache: LauncherVisualCache,
@@ -235,6 +242,8 @@ impl Launcher {
             results_progress: 0.0,
             results_target: 0.0,
             manually_expanded: false,
+            progress_config: PROGRESS_CONFIG,
+            progress_indicator: ProgressIndicator::default(),
             layout_preferences,
             app_preferences,
             visual_cache,
@@ -271,6 +280,7 @@ impl Launcher {
         self.results_progress = 0.0;
         self.results_target = 0.0;
         self.manually_expanded = false;
+        self.progress_indicator = ProgressIndicator::default();
         self.icon_resolve_in_flight = false;
     }
 
@@ -329,7 +339,62 @@ impl Launcher {
     }
 
     pub(super) fn needs_fast_tick(&self) -> bool {
-        self.is_visible && (self.results_target - self.results_progress).abs() > f32::EPSILON
+        self.is_visible
+            && ((self.results_target - self.results_progress).abs() > f32::EPSILON
+                || self.progress_indicator.needs_animation(
+                    self.progress_indicator_mode(),
+                    self.progress_config.animation(),
+                ))
+    }
+
+    fn progress_indicator_mode(&self) -> ProgressIndicatorMode {
+        self.progress_config.mode(self.progress_context())
+    }
+
+    fn progress_context(&self) -> ProgressContext {
+        ProgressContext {
+            expanding: self.results_progress < self.results_target,
+            collapsing: self.results_progress > self.results_target,
+            search_in_flight: self.search_in_flight,
+            app_refresh_in_flight: self.app_refresh_in_flight,
+            icon_resolve_in_flight: self.icon_resolve_in_flight,
+        }
+    }
+
+    pub(super) fn should_render_progress_line(&self) -> bool {
+        self.progress_config.is_enabled()
+    }
+
+    fn progress_segments(&self, width: f32) -> ProgressSegments {
+        self.progress_indicator.segments(
+            self.progress_indicator_mode(),
+            width,
+            self.progress_segment_width(width),
+        )
+    }
+
+    fn progress_segment_width(&self, width: f32) -> f32 {
+        self.progress_config.segment_width(
+            width,
+            self.layout.result_row_height,
+            self.layout.result_row_scroll_step(),
+            self.layout.results_viewport_height(),
+        )
+    }
+
+    pub(super) fn progress_line_widths(&self, width: f32) -> (f32, f32, f32) {
+        let width = width.max(0.0);
+        let segments = self.progress_segments(width);
+        let leading_track = segments.leading_track.clamp(0.0, width);
+        let active = segments.active.clamp(0.0, (width - leading_track).max(0.0));
+        let trailing_track = (width - leading_track - active).max(0.0);
+
+        (leading_track, active, trailing_track)
+    }
+
+    pub(super) fn tick_progress_indicator(&mut self) {
+        self.progress_indicator
+            .tick(self.progress_indicator_mode(), self.progress_config.animation());
     }
 
     pub(super) fn request_icon_resolution_for_visible(&mut self) -> Task<Message> {
@@ -513,5 +578,58 @@ impl Launcher {
             window_theme,
             logo_handle,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::progress::ProgressIndicatorMode;
+    use super::*;
+    use crate::core::app_command::AppCommand;
+    use std::sync::mpsc;
+
+    fn launcher() -> Launcher {
+        let (_tx, rx) = mpsc::channel::<AppCommand>();
+        let (launcher, _) = Launcher::new(rx, crate::core::tray::TrayController::detached());
+        launcher
+    }
+
+    #[test]
+    fn progress_mode_stays_hidden_for_search_when_expansion_only_profile_is_used() {
+        let mut launcher = launcher();
+        launcher.search_in_flight = true;
+
+        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+    }
+
+    #[test]
+    fn progress_mode_is_indeterminate_during_results_animation() {
+        let mut launcher = launcher();
+        launcher.results_target = 1.0;
+        launcher.results_progress = 0.45;
+
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Indeterminate
+        );
+    }
+
+    #[test]
+    fn progress_mode_hides_when_idle() {
+        let launcher = launcher();
+
+        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+    }
+
+    #[test]
+    fn progress_config_defaults_to_expansion_only_mode() {
+        let launcher = launcher();
+
+        assert!(launcher.should_render_progress_line());
+
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 }

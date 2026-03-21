@@ -33,7 +33,6 @@ fn light_scheme(seed: ThemeSeed) -> ResolvedAppearance {
     let primary_text = seed.text;
     let secondary_text = mix(primary_text, panel_background, 0.30);
     let muted_text = mix(primary_text, panel_background, 0.44);
-    let divider = mix(primary_text, panel_background, 0.86);
     let search_icon = mix(primary_text, panel_background, 0.48);
     let accent = seed.accent;
     let accent_soft = mix(accent, panel_surface_raised, 0.84);
@@ -44,7 +43,8 @@ fn light_scheme(seed: ThemeSeed) -> ResolvedAppearance {
         primary_text,
         secondary_text,
         muted_text,
-        divider,
+        progress_track: mix(primary_text, panel_background, 0.90),
+        progress_indicator: mix(accent, panel_surface_raised, 0.20),
         search_icon,
         accent,
         accent_soft,
@@ -72,7 +72,6 @@ fn dark_scheme(seed: ThemeSeed) -> ResolvedAppearance {
     let primary_text = seed.text;
     let secondary_text = mix(primary_text, panel_background, 0.24);
     let muted_text = mix(primary_text, panel_background, 0.38);
-    let divider = mix(primary_text, panel_background, 0.82);
     let search_icon = mix(primary_text, panel_background, 0.40);
     let accent = seed.accent;
     let accent_soft = mix(accent, panel_surface_raised, 0.70);
@@ -83,7 +82,8 @@ fn dark_scheme(seed: ThemeSeed) -> ResolvedAppearance {
         primary_text,
         secondary_text,
         muted_text,
-        divider,
+        progress_track: mix(primary_text, panel_background, 0.88),
+        progress_indicator: mix(accent, white(), 0.06),
         search_icon,
         accent,
         accent_soft,

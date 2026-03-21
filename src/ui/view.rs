@@ -1,7 +1,7 @@
 use super::launcher::{Launcher, Message};
 use super::styles::{
-    backdrop_style, bottom_strip_style, divider_style, panel_style, result_button_style,
-    results_scroll_style, search_input_style,
+    backdrop_style, bottom_strip_style, panel_style, progress_line_segment_style,
+    result_button_style, results_scroll_style, search_input_style,
 };
 use crate::core::desktop::{trim_label, DesktopApp};
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
@@ -45,14 +45,11 @@ impl Launcher {
             content = content.push(self.view_results_section(self.results_progress()));
         }
 
-        content = content
-            .push(
-                container("")
-                    .height(1)
-                    .width(Length::Fill)
-                    .style(move |_| divider_style(&appearance)),
-            )
-            .push(self.view_bottom_strip());
+        if self.should_render_progress_line() {
+            content = content.push(self.view_progress_line());
+        }
+
+        content = content.push(self.view_bottom_strip());
 
         let launcher_panel = container(content)
             .padding(0)
@@ -312,6 +309,30 @@ impl Launcher {
             .size(12)
             .color(self.resolved_appearance().primary_text)
             .into()
+    }
+
+    fn view_progress_line(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let (leading_track, active, trailing_track) =
+            self.progress_line_widths(self.layout.panel_width);
+
+        row![
+            container("")
+                .width(Length::Fixed(leading_track))
+                .height(1)
+                .style(move |_| progress_line_segment_style(appearance.progress_track)),
+            container("")
+                .width(Length::Fixed(active))
+                .height(1)
+                .style(move |_| progress_line_segment_style(appearance.progress_indicator)),
+            container("")
+                .width(Length::Fixed(trailing_track))
+                .height(1)
+                .style(move |_| progress_line_segment_style(appearance.progress_track)),
+        ]
+        .width(Length::Fill)
+        .height(1)
+        .into()
     }
 
     fn result_render_range(&self) -> std::ops::Range<usize> {

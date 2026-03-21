@@ -45,9 +45,9 @@ pub(super) fn panel_style(
     }
 }
 
-pub(super) fn divider_style(appearance: &ResolvedAppearance) -> container::Style {
+pub(super) fn progress_line_segment_style(color: Color) -> container::Style {
     container::Style {
-        background: Some(Background::Color(appearance.divider)),
+        background: Some(Background::Color(color)),
         ..container::Style::default()
     }
 }

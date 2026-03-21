@@ -1,5 +1,5 @@
-use iced::Color;
 use iced::theme::Palette;
+use iced::Color;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ThemePalette {
@@ -20,7 +20,8 @@ pub(crate) struct ResolvedAppearance {
     pub primary_text: Color,
     pub secondary_text: Color,
     pub muted_text: Color,
-    pub divider: Color,
+    pub progress_track: Color,
+    pub progress_indicator: Color,
     pub search_icon: Color,
     pub accent: Color,
     pub accent_soft: Color,
