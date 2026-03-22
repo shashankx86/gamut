@@ -244,6 +244,7 @@ impl ProgressIndicator {
         mode: ProgressIndicatorMode,
         track_width: f32,
         segment_width: f32,
+        finish_current_sweep: bool,
     ) -> ProgressSegments {
         let track_width = track_width.max(0.0);
         let segment_width = segment_width.max(0.0).min(track_width);
@@ -255,7 +256,8 @@ impl ProgressIndicator {
             };
         }
 
-        let show_active = matches!(mode, ProgressIndicatorMode::Indeterminate) || self.was_active;
+        let show_active = matches!(mode, ProgressIndicatorMode::Indeterminate)
+            || (finish_current_sweep && self.was_active && !self.completed_cycle);
         if !show_active {
             return ProgressSegments {
                 leading_track: 0.0,
@@ -263,12 +265,13 @@ impl ProgressIndicator {
             };
         }
 
-        let max_start = (track_width - segment_width).max(0.0);
-        let leading_track = self.phase.clamp(0.0, 1.0) * max_start;
+        let start = self.phase.clamp(0.0, 1.0) * track_width;
+        let active_start = start.clamp(0.0, track_width);
+        let active_end = (start + segment_width).clamp(0.0, track_width);
 
         ProgressSegments {
-            leading_track,
-            active: segment_width,
+            leading_track: active_start,
+            active: (active_end - active_start).max(0.0),
         }
     }
 
@@ -380,9 +383,9 @@ mod tests {
             ProgressConfig::manual_expand_indeterminate().animation()
         ));
 
-        let segments = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0);
-        assert!((segments.leading_track - 90.0).abs() < f32::EPSILON);
-        assert_eq!(segments.active, 30.0);
+        let segments = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0, false);
+        assert!((segments.leading_track - 120.0).abs() < f32::EPSILON);
+        assert_eq!(segments.active, 0.0);
     }
 
     #[test]
@@ -394,7 +397,7 @@ mod tests {
         }
 
         indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.0, false, 2);
-        let reset = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0);
+        let reset = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0, false);
         assert!(reset.leading_track <= f32::EPSILON);
     }
 

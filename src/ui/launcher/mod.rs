@@ -386,6 +386,7 @@ impl Launcher {
             self.progress_indicator_mode(),
             width,
             self.progress_segment_width(width),
+            self.progress_config.animation().finish_current_sweep,
         )
     }
 
