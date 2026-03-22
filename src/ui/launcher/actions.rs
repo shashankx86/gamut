@@ -1,7 +1,7 @@
 use super::super::constants::UNFOCUS_GUARD_MS;
 use super::super::surface::launcher_visible_surface_settings;
 use super::{Launcher, Message};
-use iced::{Task, window};
+use iced::{window, Task};
 use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -11,6 +11,7 @@ impl Launcher {
         if self.normalized_query.is_empty() && self.results_target == 0.0 {
             self.results_target = 1.0;
             self.manually_expanded = true;
+            self.manual_expand_sequence = self.manual_expand_sequence.wrapping_add(1);
         }
 
         Task::none()
