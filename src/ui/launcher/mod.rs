@@ -377,16 +377,7 @@ impl Launcher {
     }
 
     pub(super) fn should_render_progress_line(&self) -> bool {
-        if !self.progress_config.is_enabled() {
-            return false;
-        }
-
-        let results_expanded = self.results_progress > 0.0 || self.results_target > 0.0;
-        results_expanded
-            && matches!(
-                self.progress_indicator_mode(),
-                ProgressIndicatorMode::Indeterminate
-            )
+        self.progress_config.is_enabled()
     }
 
     fn progress_segments(&self, width: f32) -> ProgressSegments {
@@ -409,6 +400,10 @@ impl Launcher {
 
     pub(super) fn progress_line_widths(&self, width: f32) -> (f32, f32, f32) {
         let width = width.max(0.0);
+        if matches!(self.progress_indicator_mode(), ProgressIndicatorMode::Hidden) {
+            return (0.0, 0.0, width);
+        }
+
         let segments = self.progress_segments(width);
         let leading_track = segments.leading_track.clamp(0.0, width);
         let active = segments.active.clamp(0.0, (width - leading_track).max(0.0));
@@ -683,7 +678,7 @@ mod tests {
     fn progress_config_defaults_to_indexing_update_mode() {
         let launcher = launcher();
 
-        assert!(!launcher.should_render_progress_line());
+        assert!(launcher.should_render_progress_line());
 
         assert_eq!(
             launcher.progress_indicator_mode(),
@@ -692,19 +687,23 @@ mod tests {
     }
 
     #[test]
-    fn progress_line_only_renders_when_expanded_and_indexing_is_in_flight() {
+    fn progress_line_renders_as_divider_even_when_collapsed() {
         let mut launcher = launcher();
+
+        assert!(launcher.should_render_progress_line());
+        assert_eq!(launcher.progress_line_widths(120.0), (0.0, 0.0, 120.0));
 
         launcher.app_refresh_in_flight = true;
         launcher.app_refresh_started_at = Some(Instant::now() - APP_REFRESH_PROGRESS_DELAY);
-        assert!(!launcher.should_render_progress_line());
-
         launcher.results_target = 1.0;
         assert!(launcher.should_render_progress_line());
+        let (_leading, active, _trailing) = launcher.progress_line_widths(120.0);
+        assert!(active > 0.0);
 
         launcher.app_refresh_in_flight = false;
         launcher.app_refresh_started_at = None;
-        assert!(!launcher.should_render_progress_line());
+        assert!(launcher.should_render_progress_line());
+        assert_eq!(launcher.progress_line_widths(120.0), (0.0, 0.0, 120.0));
     }
 
     #[test]
