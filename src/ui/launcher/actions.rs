@@ -11,7 +11,6 @@ impl Launcher {
         if self.normalized_query.is_empty() && self.results_target == 0.0 {
             self.results_target = 1.0;
             self.manually_expanded = true;
-            self.manual_expand_sequence = self.manual_expand_sequence.wrapping_add(1);
         }
 
         Task::none()

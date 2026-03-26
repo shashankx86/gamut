@@ -70,15 +70,15 @@ impl ProgressConfig {
         }
     }
 
-    pub(super) const fn manual_expand_indeterminate() -> Self {
+    pub(super) const fn indexing_update_indeterminate() -> Self {
         Self {
             policy: ProgressPolicy {
                 enabled: true,
-                during_manual_expanded: true,
+                during_manual_expanded: false,
                 during_expand: false,
                 during_collapse: false,
                 during_search: false,
-                during_app_refresh: false,
+                during_app_refresh: true,
                 during_icon_resolve: false,
             },
             animation: ProgressAnimationConfig {
@@ -151,9 +151,7 @@ pub(super) struct ProgressSegments {
 #[derive(Debug, Clone)]
 pub(super) struct ProgressIndicator {
     phase: f32,
-    completed_cycle: bool,
     active_sequence: u64,
-    last_completed_sequence: Option<u64>,
     last_tick_at: Option<Instant>,
     was_active: bool,
 }
@@ -162,9 +160,7 @@ impl Default for ProgressIndicator {
     fn default() -> Self {
         Self {
             phase: 0.0,
-            completed_cycle: false,
             active_sequence: 0,
-            last_completed_sequence: None,
             last_tick_at: None,
             was_active: false,
         }
@@ -172,10 +168,6 @@ impl Default for ProgressIndicator {
 }
 
 impl ProgressIndicator {
-    pub(super) fn completed_for(&self, activation_sequence: u64) -> bool {
-        self.last_completed_sequence == Some(activation_sequence)
-    }
-
     pub(super) fn tick(
         &mut self,
         mode: ProgressIndicatorMode,
@@ -195,30 +187,23 @@ impl ProgressIndicator {
             ProgressIndicatorMode::Indeterminate => {
                 if !self.was_active || self.active_sequence != activation_sequence {
                     self.phase = 0.0;
-                    self.completed_cycle = false;
                     self.active_sequence = activation_sequence;
                 }
 
-                if !self.completed_cycle {
-                    self.phase = (self.phase + phase_delta).min(1.0);
-                    if self.phase >= 1.0 {
-                        self.completed_cycle = true;
-                        self.last_completed_sequence = Some(activation_sequence);
-                    }
-                }
+                self.phase = (self.phase + phase_delta).fract();
 
                 self.was_active = true;
             }
             ProgressIndicatorMode::Hidden => {
-                if animation.finish_current_sweep && self.was_active && !self.completed_cycle {
+                if animation.finish_current_sweep && self.was_active {
                     self.phase = (self.phase + phase_delta).min(1.0);
-                    self.completed_cycle = self.phase >= 1.0;
-                    if self.completed_cycle {
-                        self.last_completed_sequence = Some(activation_sequence);
+                    if self.phase >= 1.0 {
+                        self.phase = 0.0;
+                        self.was_active = false;
+                        self.last_tick_at = None;
                     }
                 } else {
                     self.phase = 0.0;
-                    self.completed_cycle = false;
                     self.was_active = false;
                     self.last_tick_at = None;
                 }
@@ -232,10 +217,8 @@ impl ProgressIndicator {
         animation: ProgressAnimationConfig,
     ) -> bool {
         match mode {
-            ProgressIndicatorMode::Indeterminate => !self.completed_cycle,
-            ProgressIndicatorMode::Hidden => {
-                animation.finish_current_sweep && self.was_active && !self.completed_cycle
-            }
+            ProgressIndicatorMode::Indeterminate => true,
+            ProgressIndicatorMode::Hidden => animation.finish_current_sweep && self.was_active,
         }
     }
 
@@ -257,7 +240,7 @@ impl ProgressIndicator {
         }
 
         let show_active = matches!(mode, ProgressIndicatorMode::Indeterminate)
-            || (finish_current_sweep && self.was_active && !self.completed_cycle);
+            || (finish_current_sweep && self.was_active);
         if !show_active {
             return ProgressSegments {
                 leading_track: 0.0,
@@ -273,15 +256,6 @@ impl ProgressIndicator {
             leading_track: active_start,
             active: (active_end - active_start).max(0.0),
         }
-    }
-
-    #[cfg(test)]
-    pub(super) fn mark_completed_for_testing(&mut self, activation_sequence: u64) {
-        self.last_completed_sequence = Some(activation_sequence);
-        self.completed_cycle = true;
-        self.was_active = false;
-        self.phase = 0.0;
-        self.last_tick_at = None;
     }
 
     #[cfg(test)]
@@ -304,28 +278,21 @@ impl ProgressIndicator {
             ProgressIndicatorMode::Indeterminate => {
                 if !self.was_active || self.active_sequence != activation_sequence {
                     self.phase = 0.0;
-                    self.completed_cycle = false;
                     self.active_sequence = activation_sequence;
                 }
-                if !self.completed_cycle {
-                    self.phase = (self.phase + phase_delta.max(0.0)).min(1.0);
-                    if self.phase >= 1.0 {
-                        self.completed_cycle = true;
-                        self.last_completed_sequence = Some(activation_sequence);
-                    }
-                }
+                self.phase = (self.phase + phase_delta.max(0.0)).fract();
                 self.was_active = true;
             }
             ProgressIndicatorMode::Hidden => {
-                if animation.finish_current_sweep && self.was_active && !self.completed_cycle {
+                if animation.finish_current_sweep && self.was_active {
                     self.phase = (self.phase + phase_delta.max(0.0)).min(1.0);
-                    self.completed_cycle = self.phase >= 1.0;
-                    if self.completed_cycle {
-                        self.last_completed_sequence = Some(activation_sequence);
+                    if self.phase >= 1.0 {
+                        self.phase = 0.0;
+                        self.was_active = false;
+                        self.last_tick_at = None;
                     }
                 } else {
                     self.phase = 0.0;
-                    self.completed_cycle = false;
                     self.was_active = false;
                     self.last_tick_at = None;
                 }
@@ -354,16 +321,16 @@ mod tests {
     }
 
     #[test]
-    fn manual_expansion_profile_activates_for_manual_expansion() {
-        let config = ProgressConfig::manual_expand_indeterminate();
+    fn indexing_update_profile_activates_for_refreshing_apps() {
+        let config = ProgressConfig::indexing_update_indeterminate();
 
         assert_eq!(
             config.mode(ProgressContext {
-                manual_expanded: true,
+                manual_expanded: false,
                 expanding: false,
                 collapsing: false,
                 search_in_flight: false,
-                app_refresh_in_flight: false,
+                app_refresh_in_flight: true,
                 icon_resolve_in_flight: false,
             }),
             ProgressIndicatorMode::Indeterminate
@@ -371,30 +338,28 @@ mod tests {
     }
 
     #[test]
-    fn one_shot_animation_stops_after_reaching_end() {
+    fn indeterminate_animation_keeps_looping() {
         let mut indicator = ProgressIndicator::default();
 
         for _ in 0..40 {
             indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.05, false, 1);
         }
 
-        assert!(!indicator.needs_animation(
+        assert!(indicator.needs_animation(
             ProgressIndicatorMode::Indeterminate,
-            ProgressConfig::manual_expand_indeterminate().animation()
+            ProgressConfig::indexing_update_indeterminate().animation()
         ));
 
         let segments = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0, false);
-        assert!((segments.leading_track - 120.0).abs() < f32::EPSILON);
-        assert_eq!(segments.active, 0.0);
+        assert!(segments.leading_track < 120.0);
+        assert!(segments.active > 0.0);
     }
 
     #[test]
-    fn new_manual_expand_sequence_restarts_one_shot() {
+    fn new_activation_sequence_restarts_animation_phase() {
         let mut indicator = ProgressIndicator::default();
 
-        for _ in 0..40 {
-            indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.05, false, 1);
-        }
+        indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.3, false, 1);
 
         indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.0, false, 2);
         let reset = indicator.segments(ProgressIndicatorMode::Indeterminate, 120.0, 30.0, false);
@@ -402,14 +367,14 @@ mod tests {
     }
 
     #[test]
-    fn completion_state_is_stable_after_hidden_reset() {
+    fn hidden_mode_resets_animation_when_sweep_finish_is_disabled() {
         let mut indicator = ProgressIndicator::default();
 
-        for _ in 0..40 {
-            indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.05, false, 7);
-        }
-
+        indicator.tick_by(ProgressIndicatorMode::Indeterminate, 0.4, false, 7);
         indicator.tick_by(ProgressIndicatorMode::Hidden, 0.0, false, 7);
-        assert!(indicator.completed_for(7));
+
+        let reset = indicator.segments(ProgressIndicatorMode::Hidden, 120.0, 30.0, false);
+        assert_eq!(reset.leading_track, 0.0);
+        assert_eq!(reset.active, 0.0);
     }
 }

@@ -42,7 +42,8 @@ const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const IPC_SUBSCRIPTION_ID: u64 = 1;
 const APP_SEARCH_SUBSCRIPTION_ID: u64 = IPC_SUBSCRIPTION_ID + 2;
 const APP_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
-const PROGRESS_CONFIG: ProgressConfig = ProgressConfig::manual_expand_indeterminate();
+const APP_REFRESH_PROGRESS_DELAY: Duration = Duration::from_millis(180);
+const PROGRESS_CONFIG: ProgressConfig = ProgressConfig::indexing_update_indeterminate();
 
 #[derive(Clone)]
 pub(super) struct IpcReceiverHandle {
@@ -132,7 +133,6 @@ pub(super) struct Launcher {
     pub(super) results_progress: f32,
     pub(super) results_target: f32,
     pub(super) manually_expanded: bool,
-    manual_expand_sequence: u64,
     progress_config: ProgressConfig,
     progress_indicator: ProgressIndicator,
     layout_preferences: LauncherPreferences,
@@ -142,6 +142,7 @@ pub(super) struct Launcher {
     modifiers: Modifiers,
     icon_resolve_in_flight: bool,
     app_refresh_in_flight: bool,
+    app_refresh_started_at: Option<Instant>,
     last_app_refresh_at: Option<Instant>,
     app_search_engine: ApplicationSearchEngine,
     search_results_handle: SearchResultsReceiverHandle,
@@ -243,7 +244,6 @@ impl Launcher {
             results_progress: 0.0,
             results_target: 0.0,
             manually_expanded: false,
-            manual_expand_sequence: 0,
             progress_config: PROGRESS_CONFIG,
             progress_indicator: ProgressIndicator::default(),
             layout_preferences,
@@ -253,6 +253,7 @@ impl Launcher {
             modifiers: Modifiers::default(),
             icon_resolve_in_flight: false,
             app_refresh_in_flight: false,
+            app_refresh_started_at: None,
             last_app_refresh_at: None,
             app_search_engine,
             search_results_handle: SearchResultsReceiverHandle::new(search_results_receiver),
@@ -282,9 +283,9 @@ impl Launcher {
         self.results_progress = 0.0;
         self.results_target = 0.0;
         self.manually_expanded = false;
-        self.manual_expand_sequence = 0;
         self.progress_indicator = ProgressIndicator::default();
         self.icon_resolve_in_flight = false;
+        self.app_refresh_started_at = None;
     }
 
     pub(super) fn results_progress(&self) -> f32 {
@@ -345,23 +346,14 @@ impl Launcher {
         let mode = self.progress_indicator_mode();
         self.is_visible
             && ((self.results_target - self.results_progress).abs() > f32::EPSILON
-                || self.progress_indicator.needs_animation(
-                    mode,
-                    self.progress_config.animation(),
-                ))
+                || (self.should_render_progress_line()
+                    && self
+                        .progress_indicator
+                        .needs_animation(mode, self.progress_config.animation())))
     }
 
     fn progress_indicator_mode(&self) -> ProgressIndicatorMode {
-        let mode = self.progress_config.mode(self.progress_context());
-        if matches!(mode, ProgressIndicatorMode::Indeterminate)
-            && self
-                .progress_indicator
-                .completed_for(self.manual_expand_sequence)
-        {
-            ProgressIndicatorMode::Hidden
-        } else {
-            mode
-        }
+        self.progress_config.mode(self.progress_context())
     }
 
     fn progress_context(&self) -> ProgressContext {
@@ -372,13 +364,29 @@ impl Launcher {
                 && self.results_target > 0.0,
             collapsing: self.results_progress > self.results_target,
             search_in_flight: self.search_in_flight,
-            app_refresh_in_flight: self.app_refresh_in_flight,
+            app_refresh_in_flight: self.indexing_progress_ready(),
             icon_resolve_in_flight: self.icon_resolve_in_flight,
         }
     }
 
+    fn indexing_progress_ready(&self) -> bool {
+        self.app_refresh_in_flight
+            && self
+                .app_refresh_started_at
+                .is_some_and(|started_at| started_at.elapsed() >= APP_REFRESH_PROGRESS_DELAY)
+    }
+
     pub(super) fn should_render_progress_line(&self) -> bool {
-        self.progress_config.is_enabled()
+        if !self.progress_config.is_enabled() {
+            return false;
+        }
+
+        let results_expanded = self.results_progress > 0.0 || self.results_target > 0.0;
+        results_expanded
+            && matches!(
+                self.progress_indicator_mode(),
+                ProgressIndicatorMode::Indeterminate
+            )
     }
 
     fn progress_segments(&self, width: f32) -> ProgressSegments {
@@ -413,7 +421,7 @@ impl Launcher {
         self.progress_indicator.tick(
             self.progress_indicator_mode(),
             self.progress_config.animation(),
-            self.manual_expand_sequence,
+            0,
         );
     }
 
@@ -460,6 +468,7 @@ impl Launcher {
         }
 
         self.app_refresh_in_flight = true;
+        self.app_refresh_started_at = Some(Instant::now());
         Task::perform(async { refresh_app_cache() }, Message::AppsLoaded)
     }
 
@@ -485,6 +494,7 @@ impl Launcher {
 
     pub(super) fn finish_app_refresh(&mut self) {
         self.app_refresh_in_flight = false;
+        self.app_refresh_started_at = None;
         self.last_app_refresh_at = Some(Instant::now());
     }
 
@@ -615,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn progress_mode_stays_hidden_for_search_when_expansion_only_profile_is_used() {
+    fn progress_mode_stays_hidden_for_search_when_indexing_profile_is_used() {
         let mut launcher = launcher();
         launcher.search_in_flight = true;
 
@@ -623,12 +633,10 @@ mod tests {
     }
 
     #[test]
-    fn progress_mode_is_indeterminate_during_results_animation() {
+    fn progress_mode_is_indeterminate_during_indexing_updates() {
         let mut launcher = launcher();
-        launcher.results_target = 1.0;
-        launcher.results_progress = 1.0;
-        launcher.manually_expanded = true;
-        launcher.manual_expand_sequence = 2;
+        launcher.app_refresh_in_flight = true;
+        launcher.app_refresh_started_at = Some(Instant::now() - APP_REFRESH_PROGRESS_DELAY);
 
         assert_eq!(
             launcher.progress_indicator_mode(),
@@ -647,13 +655,9 @@ mod tests {
     }
 
     #[test]
-    fn progress_mode_hides_after_completing_current_manual_expand_sequence() {
+    fn progress_mode_hides_when_indexing_finishes() {
         let mut launcher = launcher();
-        launcher.manually_expanded = true;
-        launcher.manual_expand_sequence = 3;
-        launcher
-            .progress_indicator
-            .mark_completed_for_testing(launcher.manual_expand_sequence);
+        launcher.app_refresh_in_flight = false;
 
         assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
     }
@@ -666,25 +670,49 @@ mod tests {
     }
 
     #[test]
-    fn manual_expand_command_increments_progress_sequence() {
+    fn manual_expand_does_not_force_progress_indicator() {
         let mut launcher = launcher();
-        let initial_sequence = launcher.manual_expand_sequence;
 
         let _ = launcher.expand_results();
 
-        assert_eq!(launcher.manual_expand_sequence, initial_sequence.wrapping_add(1));
         assert!(launcher.manually_expanded);
+        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
     }
 
     #[test]
-    fn progress_config_defaults_to_expansion_only_mode() {
+    fn progress_config_defaults_to_indexing_update_mode() {
         let launcher = launcher();
 
-        assert!(launcher.should_render_progress_line());
+        assert!(!launcher.should_render_progress_line());
 
         assert_eq!(
             launcher.progress_indicator_mode(),
             ProgressIndicatorMode::Hidden
         );
+    }
+
+    #[test]
+    fn progress_line_only_renders_when_expanded_and_indexing_is_in_flight() {
+        let mut launcher = launcher();
+
+        launcher.app_refresh_in_flight = true;
+        launcher.app_refresh_started_at = Some(Instant::now() - APP_REFRESH_PROGRESS_DELAY);
+        assert!(!launcher.should_render_progress_line());
+
+        launcher.results_target = 1.0;
+        assert!(launcher.should_render_progress_line());
+
+        launcher.app_refresh_in_flight = false;
+        launcher.app_refresh_started_at = None;
+        assert!(!launcher.should_render_progress_line());
+    }
+
+    #[test]
+    fn progress_mode_stays_hidden_for_short_indexing_bursts() {
+        let mut launcher = launcher();
+        launcher.app_refresh_in_flight = true;
+        launcher.app_refresh_started_at = Some(Instant::now());
+
+        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
     }
 }
