@@ -191,7 +191,7 @@ impl Launcher {
             container(
                 text(&app.entry_type)
                     .size(
-                        (self.layout.result_secondary_text_size - 1.0)
+                        (self.layout.result_secondary_text_size + 1.0)
                             .max(RESULT_META_TEXT_MIN_SIZE)
                     )
                     .color(appearance.muted_text),
