@@ -1,19 +1,24 @@
-use super::{AppCommandReceiverHandle, IpcReceiverHandle, Message, SearchResultsReceiverHandle};
+use super::{AppCommandReceiverHandle, IpcReceiverHandle, SearchResultsReceiverHandle};
+use crate::ui::launcher::Message;
 use iced::futures::{SinkExt, StreamExt, channel::mpsc, stream::BoxStream};
 use iced::stream;
 
-pub(super) fn ipc_command_stream(handle: &IpcReceiverHandle) -> BoxStream<'static, Message> {
-    receiver_stream(handle.receiver.clone(), Message::IpcCommand)
+pub(in crate::ui::launcher) fn ipc_command_stream(
+    handle: &IpcReceiverHandle,
+) -> BoxStream<'static, Message> {
+    receiver_stream(handle.receiver(), Message::IpcCommand)
 }
 
-pub(super) fn app_command_stream(handle: &AppCommandReceiverHandle) -> BoxStream<'static, Message> {
-    receiver_stream(handle.receiver.clone(), Message::AppCommand)
+pub(in crate::ui::launcher) fn app_command_stream(
+    handle: &AppCommandReceiverHandle,
+) -> BoxStream<'static, Message> {
+    receiver_stream(handle.receiver(), Message::AppCommand)
 }
 
-pub(super) fn search_results_stream(
+pub(in crate::ui::launcher) fn search_results_stream(
     handle: &SearchResultsReceiverHandle,
 ) -> BoxStream<'static, Message> {
-    receiver_stream(handle.receiver.clone(), Message::SearchResultsLoaded)
+    receiver_stream(handle.receiver(), Message::SearchResultsLoaded)
 }
 
 fn receiver_stream<T, F>(

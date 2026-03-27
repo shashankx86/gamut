@@ -1,5 +1,6 @@
 mod config;
 mod model;
+mod normalize;
 mod store;
 
 pub(crate) use config::{
@@ -11,4 +12,5 @@ pub(crate) use model::{
     ShortcutAction, ShortcutBinding, ShortcutPreferences, ThemeColors, ThemePreference,
     ThemeSchemeId,
 };
+pub(crate) use normalize::{normalize_identifier, normalize_key_token};
 pub(crate) use store::{config_path, load_preferences, save_preferences};

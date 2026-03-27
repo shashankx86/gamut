@@ -5,19 +5,22 @@ const SNAP_THRESHOLD: f32 = 0.01;
 const EXPANSION_RENDER_BUFFER_ROWS: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SurfaceResize {
+pub(in crate::ui::launcher) enum SurfaceResize {
     None,
     Expanded,
     Collapsed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct AnimationStep {
-    pub(super) next_progress: f32,
-    pub(super) surface_resize: SurfaceResize,
+pub(in crate::ui::launcher) struct AnimationStep {
+    pub(in crate::ui::launcher) next_progress: f32,
+    pub(in crate::ui::launcher) surface_resize: SurfaceResize,
 }
 
-pub(super) fn results_target(query_is_empty: bool, manually_expanded: bool) -> f32 {
+pub(in crate::ui::launcher) fn results_target(
+    query_is_empty: bool,
+    manually_expanded: bool,
+) -> f32 {
     if query_is_empty && !manually_expanded {
         0.0
     } else {
@@ -25,7 +28,7 @@ pub(super) fn results_target(query_is_empty: bool, manually_expanded: bool) -> f
     }
 }
 
-pub(super) fn animate_results(
+pub(in crate::ui::launcher) fn animate_results(
     progress: f32,
     target: f32,
     layout: &LauncherLayout,
@@ -109,7 +112,11 @@ pub(in crate::ui) fn spacer_height_for_rows(
     }
 }
 
-pub(super) fn scroll_start_for_offset(offset_y: f32, row_step: f32, max_start: usize) -> usize {
+pub(in crate::ui::launcher) fn scroll_start_for_offset(
+    offset_y: f32,
+    row_step: f32,
+    max_start: usize,
+) -> usize {
     if !offset_y.is_finite() || row_step <= 0.0 {
         return 0;
     }
@@ -117,7 +124,7 @@ pub(super) fn scroll_start_for_offset(offset_y: f32, row_step: f32, max_start: u
     ((offset_y.max(0.0) / row_step).floor() as usize).min(max_start)
 }
 
-pub(super) fn clamp_scroll_offset(
+pub(in crate::ui::launcher) fn clamp_scroll_offset(
     offset_y: f32,
     total_rows: usize,
     viewport_height: f32,
@@ -138,7 +145,7 @@ pub(super) fn clamp_scroll_offset(
     }
 }
 
-pub(super) fn scroll_offset_for_selection(
+pub(in crate::ui::launcher) fn scroll_offset_for_selection(
     selected_rank: usize,
     current_offset: f32,
     viewport_height: f32,
@@ -181,7 +188,11 @@ pub(super) fn scroll_offset_for_selection(
     )
 }
 
-pub(super) fn move_selection(selected_rank: usize, item_count: usize, offset: isize) -> usize {
+pub(in crate::ui::launcher) fn move_selection(
+    selected_rank: usize,
+    item_count: usize,
+    offset: isize,
+) -> usize {
     if item_count == 0 {
         return 0;
     }

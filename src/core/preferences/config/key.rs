@@ -90,7 +90,7 @@ impl FromStr for ConfigKey {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match normalize(value).as_str() {
+        match crate::core::preferences::normalize_identifier(value).as_str() {
             "appearancetheme" => Ok(Self::AppearanceTheme),
             "appearanceradius" => Ok(Self::AppearanceRadius),
             "appearancethemebackground" => Ok(Self::AppearanceThemeBackground),
@@ -109,13 +109,6 @@ impl FromStr for ConfigKey {
             _ => Err(format!("unknown config key `{value}`")),
         }
     }
-}
-
-fn normalize(value: &str) -> String {
-    value
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '_', '-', '.'], "")
 }
 
 #[cfg(test)]

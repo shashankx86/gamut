@@ -173,7 +173,7 @@ impl FromStr for ShortcutAction {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match normalize_action_name(value).as_str() {
+        match crate::core::preferences::normalize_identifier(value).as_str() {
             "launchselected" | "shortcutslaunchselected" => Ok(Self::LaunchSelected),
             "expand" | "shortcutsexpand" => Ok(Self::Expand),
             "expandormovedown" => Ok(Self::MoveDown),
@@ -209,7 +209,7 @@ impl ShortcutBinding {
     }
 
     pub fn normalized_key(&self) -> String {
-        normalize_key_name(&self.key)
+        crate::core::preferences::normalize_key_token(&self.key)
     }
 }
 
@@ -257,7 +257,7 @@ impl FromStr for ShortcutBinding {
                         return Err("shortcut can only contain one key".to_string());
                     }
 
-                    let normalized = normalize_key_name(part);
+                    let normalized = crate::core::preferences::normalize_key_token(part);
                     if normalized.is_empty() {
                         return Err("shortcut key cannot be empty".to_string());
                     }
@@ -273,7 +273,7 @@ impl FromStr for ShortcutBinding {
 }
 
 fn pretty_key_name(key: &str) -> String {
-    match normalize_key_name(key).as_str() {
+    match crate::core::preferences::normalize_key_token(key).as_str() {
         "arrowup" => "ArrowUp".to_string(),
         "arrowdown" => "ArrowDown".to_string(),
         "arrowleft" => "ArrowLeft".to_string(),
@@ -290,17 +290,6 @@ fn pretty_key_name(key: &str) -> String {
             }
         }
     }
-}
-
-fn normalize_key_name(key: &str) -> String {
-    key.trim().to_ascii_lowercase().replace([' ', '_', '-'], "")
-}
-
-fn normalize_action_name(value: &str) -> String {
-    value
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '_', '-', '.'], "")
 }
 
 #[cfg(test)]

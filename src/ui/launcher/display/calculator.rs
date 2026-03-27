@@ -8,7 +8,7 @@ pub(in crate::ui) struct CalculationPreview {
 const FRACTION_TOLERANCE: f64 = 1e-9;
 const MAX_WORDS_INTEGER: i64 = 999_999_999_999;
 
-pub(super) fn calculation_preview(query: &str) -> Option<CalculationPreview> {
+pub(in crate::ui::launcher) fn calculation_preview(query: &str) -> Option<CalculationPreview> {
     let expression = query.trim();
     if expression.is_empty() {
         return None;
@@ -190,7 +190,10 @@ impl<'a> ExpressionParser<'a> {
         }
 
         let token = &self.input[start..self.cursor];
-        let sanitized: String = token.chars().filter(|ch| *ch != ',' && *ch != '_').collect();
+        let sanitized: String = token
+            .chars()
+            .filter(|ch| *ch != ',' && *ch != '_')
+            .collect();
 
         sanitized.parse::<f64>().ok()
     }
@@ -254,31 +257,11 @@ fn rounded_integer(value: f64) -> Option<i64> {
 }
 
 fn format_integer(value: i64) -> String {
-    let value = i128::from(value);
-    if value < 0 {
-        format!("-{}", format_integer_from_str(&(-value).to_string()))
-    } else {
-        format_integer_from_str(&value.to_string())
-    }
+    crate::ui::format::group_i128(i128::from(value))
 }
 
 fn format_integer_from_str(value: &str) -> String {
-    let (sign, digits) = if let Some(rest) = value.strip_prefix('-') {
-        ("-", rest)
-    } else {
-        ("", value)
-    };
-
-    let mut output = String::new();
-    for (index, ch) in digits.chars().rev().enumerate() {
-        if index > 0 && index % 3 == 0 {
-            output.push(',');
-        }
-        output.push(ch);
-    }
-
-    let grouped: String = output.chars().rev().collect();
-    format!("{sign}{grouped}")
+    crate::ui::format::group_signed_integer_str(value)
 }
 
 fn integer_words(value: f64) -> Option<String> {
@@ -324,13 +307,29 @@ fn integer_words(value: f64) -> Option<String> {
 
 fn chunk_to_words(value: u16) -> String {
     const BELOW_TWENTY: [&str; 20] = [
-        "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-        "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
-        "Seventeen", "Eighteen", "Nineteen",
+        "",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+        "Ten",
+        "Eleven",
+        "Twelve",
+        "Thirteen",
+        "Fourteen",
+        "Fifteen",
+        "Sixteen",
+        "Seventeen",
+        "Eighteen",
+        "Nineteen",
     ];
     const TENS: [&str; 10] = [
-        "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty",
-        "Ninety",
+        "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
     ];
 
     let hundreds = value / 100;
@@ -352,8 +351,7 @@ fn chunk_to_words(value: u16) -> String {
             } else {
                 parts.push(format!(
                     "{} {}",
-                    TENS[tens as usize],
-                    BELOW_TWENTY[ones as usize]
+                    TENS[tens as usize], BELOW_TWENTY[ones as usize]
                 ));
             }
         }

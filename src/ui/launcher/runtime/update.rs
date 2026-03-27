@@ -1,4 +1,4 @@
-use super::{Launcher, Message};
+use super::super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
 use iced::{Task, clipboard};

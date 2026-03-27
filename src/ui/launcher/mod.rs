@@ -1,12 +1,7 @@
-mod actions;
-mod calculator;
-mod input;
-mod progress;
-mod receiver;
-mod search;
-mod state;
-mod subscription;
-mod update;
+mod channel;
+mod data;
+mod display;
+mod runtime;
 
 use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
@@ -28,86 +23,25 @@ use iced::widget::{self, scrollable};
 use iced::{Task, window};
 use iced_layershell::to_layer_message;
 use log::warn;
-use progress::{
+use runtime::progress::{
     ProgressConfig, ProgressContext, ProgressIndicator, ProgressIndicatorMode, ProgressSegments,
 };
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-pub(in crate::ui) use state::{render_range_for_viewport, spacer_height_for_rows};
+use channel::{
+    AppCommandReceiverHandle, IpcReceiverHandle, SearchResultsReceiverHandle,
+    new_app_command_handle, new_ipc_receiver_handle, new_search_results_handle,
+};
+use display::calculator;
+
+pub(in crate::ui) use display::state::{render_range_for_viewport, spacer_height_for_rows};
 
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
-const IPC_SUBSCRIPTION_ID: u64 = 1;
-const APP_SEARCH_SUBSCRIPTION_ID: u64 = IPC_SUBSCRIPTION_ID + 2;
 const APP_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 const APP_REFRESH_PROGRESS_DELAY: Duration = Duration::from_millis(180);
 const PROGRESS_CONFIG: ProgressConfig = ProgressConfig::indexing_update_indeterminate();
-
-#[derive(Clone)]
-pub(super) struct IpcReceiverHandle {
-    id: u64,
-    receiver: Arc<Mutex<Receiver<IpcCommand>>>,
-}
-
-#[derive(Clone)]
-pub(super) struct AppCommandReceiverHandle {
-    id: u64,
-    receiver: Arc<Mutex<Receiver<AppCommand>>>,
-}
-
-impl AppCommandReceiverHandle {
-    fn new(receiver: Receiver<AppCommand>) -> Self {
-        Self {
-            id: IPC_SUBSCRIPTION_ID + 1,
-            receiver: Arc::new(Mutex::new(receiver)),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub(super) struct SearchResultsReceiverHandle {
-    id: u64,
-    receiver: Arc<Mutex<Receiver<ApplicationSearchResponse>>>,
-}
-
-impl SearchResultsReceiverHandle {
-    fn new(receiver: Receiver<ApplicationSearchResponse>) -> Self {
-        Self {
-            id: APP_SEARCH_SUBSCRIPTION_ID,
-            receiver: Arc::new(Mutex::new(receiver)),
-        }
-    }
-}
-
-impl Hash for SearchResultsReceiverHandle {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl Hash for AppCommandReceiverHandle {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl IpcReceiverHandle {
-    fn new(receiver: Receiver<IpcCommand>) -> Self {
-        Self {
-            id: IPC_SUBSCRIPTION_ID,
-            receiver: Arc::new(Mutex::new(receiver)),
-        }
-    }
-}
-
-impl Hash for IpcReceiverHandle {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
 
 pub(super) struct Launcher {
     pub(super) apps: Vec<DesktopApp>,
@@ -202,7 +136,7 @@ impl Launcher {
             ApplicationSearchEngine::spawn(MAX_RESULTS);
         let (ipc_handle, startup_task) = match start_listener() {
             Ok(receiver) => (
-                IpcReceiverHandle::new(receiver),
+                new_ipc_receiver_handle(receiver),
                 if cached_catalog.needs_refresh {
                     Task::perform(async { refresh_app_cache() }, Message::AppsLoaded)
                 } else {
@@ -212,7 +146,7 @@ impl Launcher {
             Err(error) => {
                 let (_tx, receiver) = mpsc::channel();
                 (
-                    IpcReceiverHandle::new(receiver),
+                    new_ipc_receiver_handle(receiver),
                     Task::done(Message::FatalError(format!(
                         "IPC listener unavailable: {error}. daemon mode unavailable."
                     ))),
@@ -257,9 +191,9 @@ impl Launcher {
             app_refresh_started_at: None,
             last_app_refresh_at: None,
             app_search_engine,
-            search_results_handle: SearchResultsReceiverHandle::new(search_results_receiver),
+            search_results_handle: new_search_results_handle(search_results_receiver),
             ipc_handle,
-            app_command_handle: AppCommandReceiverHandle::new(command_receiver),
+            app_command_handle: new_app_command_handle(command_receiver),
         };
 
         if !cached_catalog.apps.is_empty() {
@@ -278,13 +212,10 @@ impl Launcher {
     }
 
     fn clear_window_state(&mut self) {
-        self.selection_revision = self.selection_revision.wrapping_add(1);
+        self.bump_selection_revision();
         self.reset_search_state();
         self.ignore_unfocus_until = None;
-        self.selected_rank = 0;
-        self.highlighted_rank = 0;
-        self.results_scroll_offset = 0.0;
-        self.scroll_start_rank = 0;
+        self.reset_selection_cursor_state();
         self.results_progress = 0.0;
         self.results_target = 0.0;
         self.manually_expanded = false;
@@ -298,12 +229,18 @@ impl Launcher {
     }
 
     pub(super) fn sync_results_target_with_query(&mut self) {
-        self.results_target =
-            state::results_target(self.normalized_query.is_empty(), self.manually_expanded);
+        self.results_target = display::state::results_target(
+            self.normalized_query.is_empty(),
+            self.manually_expanded,
+        );
     }
 
     pub(super) fn animate_results(&mut self) -> Task<Message> {
-        let step = state::animate_results(self.results_progress, self.results_target, &self.layout);
+        let step = display::state::animate_results(
+            self.results_progress,
+            self.results_target,
+            &self.layout,
+        );
         self.results_progress = step.next_progress;
 
         let Some(id) = self.launcher_window_id else {
@@ -311,12 +248,12 @@ impl Launcher {
         };
 
         match step.surface_resize {
-            state::SurfaceResize::None => Task::none(),
-            state::SurfaceResize::Expanded => Task::done(Message::SizeChange {
+            display::state::SurfaceResize::None => Task::none(),
+            display::state::SurfaceResize::Expanded => Task::done(Message::SizeChange {
                 id,
                 size: self.layout.expanded_surface_size(),
             }),
-            state::SurfaceResize::Collapsed => Task::done(Message::SizeChange {
+            display::state::SurfaceResize::Collapsed => Task::done(Message::SizeChange {
                 id,
                 size: self.layout.collapsed_surface_size(),
             }),
@@ -348,7 +285,7 @@ impl Launcher {
 
     pub(super) fn move_selection(&mut self, offset: isize) {
         self.selected_rank =
-            state::move_selection(self.selected_rank, self.filtered_indices.len(), offset);
+            display::state::move_selection(self.selected_rank, self.filtered_indices.len(), offset);
     }
 
     pub(super) fn needs_fast_tick(&self) -> bool {
@@ -409,7 +346,10 @@ impl Launcher {
 
     pub(super) fn progress_line_widths(&self, width: f32) -> (f32, f32, f32) {
         let width = width.max(0.0);
-        if matches!(self.progress_indicator_mode(), ProgressIndicatorMode::Hidden) {
+        if matches!(
+            self.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        ) {
             return (0.0, 0.0, width);
         }
 
@@ -617,7 +557,7 @@ impl Launcher {
 
 #[cfg(test)]
 mod tests {
-    use super::progress::ProgressIndicatorMode;
+    use super::runtime::progress::ProgressIndicatorMode;
     use super::*;
     use crate::core::app_command::AppCommand;
     use std::sync::mpsc;
@@ -633,7 +573,10 @@ mod tests {
         let mut launcher = launcher();
         launcher.search_in_flight = true;
 
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 
     #[test]
@@ -655,7 +598,10 @@ mod tests {
         launcher.results_progress = 0.45;
         launcher.manually_expanded = false;
 
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 
     #[test]
@@ -663,14 +609,20 @@ mod tests {
         let mut launcher = launcher();
         launcher.app_refresh_in_flight = false;
 
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 
     #[test]
     fn progress_mode_hides_when_idle() {
         let launcher = launcher();
 
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 
     #[test]
@@ -680,7 +632,10 @@ mod tests {
         let _ = launcher.expand_results();
 
         assert!(launcher.manually_expanded);
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 
     #[test]
@@ -721,6 +676,9 @@ mod tests {
         launcher.app_refresh_in_flight = true;
         launcher.app_refresh_started_at = Some(Instant::now());
 
-        assert_eq!(launcher.progress_indicator_mode(), ProgressIndicatorMode::Hidden);
+        assert_eq!(
+            launcher.progress_indicator_mode(),
+            ProgressIndicatorMode::Hidden
+        );
     }
 }

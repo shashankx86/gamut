@@ -1,17 +1,16 @@
 mod daemon;
 
 use crate::core::cli::{CliCommand, CliMode, parse_command, print_help, print_version};
+use crate::core::error::DynError;
 use crate::core::ipc::IpcCommand;
 use crate::core::logging;
 use crate::core::preferences::run_config;
 use std::env;
-use std::error::Error;
 use std::ffi::OsString;
 use std::time::Duration;
 
 use log::info;
 
-type DynError = Box<dyn Error>;
 const DAEMON_START_RETRIES: usize = 40;
 const DAEMON_START_DELAY: Duration = Duration::from_millis(50);
 

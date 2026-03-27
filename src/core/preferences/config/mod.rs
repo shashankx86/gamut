@@ -8,12 +8,10 @@ use super::{
     ShortcutBinding, ShortcutPreferences, ThemeColors, ThemePreference, config_path,
     load_preferences, save_preferences,
 };
+use crate::core::error::DynError;
 use crate::core::ipc::{IpcCommand, send_command};
 use crate::core::theme::default_custom_theme_colors;
-use std::error::Error;
 use std::io;
-
-type DynError = Box<dyn Error>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigCommand {

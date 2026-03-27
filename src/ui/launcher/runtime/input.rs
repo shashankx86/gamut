@@ -1,10 +1,10 @@
-use super::{Launcher, Message};
+use super::super::{Launcher, Message};
 use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{operation, scrollable};
 use iced::{Task, window};
 
 impl Launcher {
-    pub(super) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
+    pub(in crate::ui::launcher) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
         if self.is_launcher_window(id) {
             let monitor_size = window::monitor_size(id).map(Message::MonitorSizeLoaded);
 
@@ -25,7 +25,7 @@ impl Launcher {
         Task::none()
     }
 
-    pub(super) fn on_window_closed(&mut self, id: window::Id) -> Task<Message> {
+    pub(in crate::ui::launcher) fn on_window_closed(&mut self, id: window::Id) -> Task<Message> {
         if self.is_launcher_window(id) {
             self.launcher_window_id = None;
             self.is_visible = false;
@@ -35,7 +35,7 @@ impl Launcher {
         Task::none()
     }
 
-    pub(super) fn handle_key_event(
+    pub(in crate::ui::launcher) fn handle_key_event(
         &mut self,
         id: window::Id,
         event: keyboard::Event,
@@ -66,7 +66,7 @@ impl Launcher {
         }
     }
 
-    pub(super) fn handle_window_event(
+    pub(in crate::ui::launcher) fn handle_window_event(
         &mut self,
         id: window::Id,
         event: window::Event,
@@ -86,7 +86,7 @@ impl Launcher {
         Task::none()
     }
 
-    pub(super) fn handle_launcher_key_press(
+    pub(in crate::ui::launcher) fn handle_launcher_key_press(
         &mut self,
         key: Key,
         modifiers: Modifiers,
@@ -119,7 +119,7 @@ impl Launcher {
             physical_key,
         ) {
             let previous_rank = self.selected_rank;
-            self.selection_revision = self.selection_revision.wrapping_add(1);
+            self.bump_selection_revision();
             self.move_selection(1);
             return self.scroll_to_selected(previous_rank, false);
         }
@@ -131,7 +131,7 @@ impl Launcher {
             physical_key,
         ) {
             let previous_rank = self.selected_rank;
-            self.selection_revision = self.selection_revision.wrapping_add(1);
+            self.bump_selection_revision();
             self.move_selection(-1);
             return self.scroll_to_selected(previous_rank, false);
         }
@@ -150,7 +150,7 @@ impl Launcher {
         Task::none()
     }
 
-    pub(super) fn scroll_to_selected(
+    pub(in crate::ui::launcher) fn scroll_to_selected(
         &mut self,
         previous_rank: usize,
         force: bool,
@@ -174,7 +174,7 @@ impl Launcher {
 
         let total_rows = self.filtered_indices().len();
         let previous_offset = self.results_scroll_offset;
-        let target_offset = super::state::scroll_offset_for_selection(
+        let target_offset = super::super::display::state::scroll_offset_for_selection(
             self.selected_rank,
             previous_offset,
             self.layout.results_viewport_height(),
@@ -184,7 +184,7 @@ impl Launcher {
             self.layout.result_row_inset_y,
         );
         self.results_scroll_offset = target_offset;
-        self.scroll_start_rank = super::state::scroll_start_for_offset(
+        self.scroll_start_rank = super::super::display::state::scroll_start_for_offset(
             target_offset,
             self.layout.result_row_scroll_step(),
             total_rows.saturating_sub(1),
@@ -221,14 +221,17 @@ impl Launcher {
         }
     }
 
-    pub(super) fn on_results_scrolled(&mut self, viewport: scrollable::Viewport) -> Task<Message> {
+    pub(in crate::ui::launcher) fn on_results_scrolled(
+        &mut self,
+        viewport: scrollable::Viewport,
+    ) -> Task<Message> {
         let row_step = self.layout.result_row_scroll_step();
 
         if row_step <= 0.0 {
             return Task::none();
         }
 
-        let offset = super::state::clamp_scroll_offset(
+        let offset = super::super::display::state::clamp_scroll_offset(
             viewport.absolute_offset().y,
             self.filtered_indices().len(),
             viewport.bounds().height,
@@ -236,7 +239,7 @@ impl Launcher {
             self.layout.result_row_gap,
         );
 
-        let start = super::state::scroll_start_for_offset(
+        let start = super::super::display::state::scroll_start_for_offset(
             offset,
             row_step,
             self.filtered_indices().len().saturating_sub(1),
@@ -303,10 +306,7 @@ fn push_candidate(candidates: &mut Vec<String>, value: String) {
 }
 
 fn normalize_binding_key(value: &str) -> String {
-    value
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '_', '-'], "")
+    crate::core::preferences::normalize_key_token(value)
 }
 
 #[cfg(test)]

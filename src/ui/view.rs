@@ -1,15 +1,15 @@
 use super::launcher::{Launcher, Message};
 use super::styles::{
-    backdrop_style, bottom_strip_style, panel_style, progress_line_segment_style,
-    calculator_badge_style, calculator_card_style, calculator_divider_style,
-    result_button_style, results_scroll_style, search_input_style,
+    backdrop_style, bottom_strip_style, calculator_badge_style, calculator_card_style,
+    calculator_divider_style, panel_style, progress_line_segment_style, result_button_style,
+    results_scroll_style, search_input_style,
 };
-use crate::core::desktop::{trim_label, DesktopApp};
+use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
-use iced::{window, ContentFit, Element, Length};
+use iced::{ContentFit, Element, Length, window};
 use iced_shadcn::{
-    icon_button, ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
-    Theme as ShadcnTheme,
+    ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
+    Theme as ShadcnTheme, icon_button,
 };
 use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
 
@@ -266,9 +266,13 @@ impl Launcher {
                 .align_x(iced::alignment::Horizontal::Center)
                 .size(headline_size)
                 .color(appearance.primary_text),
-            container(text("Question").size(badge_size).color(appearance.muted_text))
-                .padding([2, 8])
-                .style(move |_| calculator_badge_style(&appearance)),
+            container(
+                text("Question")
+                    .size(badge_size)
+                    .color(appearance.muted_text)
+            )
+            .padding([2, 8])
+            .style(move |_| calculator_badge_style(&appearance)),
         ]
         .spacing(6)
         .width(Length::Fill)
@@ -280,9 +284,13 @@ impl Launcher {
                 .align_x(iced::alignment::Horizontal::Center)
                 .size(headline_size)
                 .color(appearance.primary_text),
-            container(text(value_caption).size(badge_size).color(appearance.muted_text))
-                .padding([2, 8])
-                .style(move |_| calculator_badge_style(&appearance)),
+            container(
+                text(value_caption)
+                    .size(badge_size)
+                    .color(appearance.muted_text)
+            )
+            .padding([2, 8])
+            .style(move |_| calculator_badge_style(&appearance)),
         ]
         .spacing(6)
         .width(Length::Fill)
@@ -308,11 +316,15 @@ impl Launcher {
         .align_y(iced::alignment::Vertical::Center)
         .height(Length::Fill);
 
-        container(container(card)
-            .padding([16, 18])
-            .style(move |_| calculator_card_style(&self.layout, &appearance)))
+        container(
+            container(card)
+                .padding([16, 18])
+                .style(move |_| calculator_card_style(&self.layout, &appearance)),
+        )
         .width(Length::Fill)
-        .height(Length::Fixed((self.layout.result_row_height * 1.9).max(108.0)))
+        .height(Length::Fixed(
+            (self.layout.result_row_height * 1.9).max(108.0),
+        ))
         .padding([self.layout.result_row_inset_y as u16, 0])
         .into()
     }
@@ -342,7 +354,11 @@ impl Launcher {
             )
         } else {
             (
-                if calculator_active { "Copy Result" } else { "Open" },
+                if calculator_active {
+                    "Copy Result"
+                } else {
+                    "Open"
+                },
                 action_icon_button(
                     icon_corner_down_left().size(BOTTOM_STRIP_ICON_SIZE),
                     &shadcn_theme,
@@ -556,32 +572,16 @@ fn normalize_result_display_value(value: &str) -> String {
     let cleaned: String = value.chars().filter(|ch| *ch != ',').collect();
 
     if let Ok(integer) = cleaned.parse::<i128>() {
-        return format_i128_with_grouping(integer);
+        return crate::ui::format::group_i128(integer);
     }
 
     if let Some((integer, fraction)) = cleaned.split_once('.')
         && let Ok(integer) = integer.parse::<i128>()
     {
-        return format!("{}.{}", format_i128_with_grouping(integer), fraction);
+        return format!("{}.{}", crate::ui::format::group_i128(integer), fraction);
     }
 
     value.to_string()
-}
-
-fn format_i128_with_grouping(value: i128) -> String {
-    let sign = if value < 0 { "-" } else { "" };
-    let digits = value.abs().to_string();
-    let mut grouped = String::new();
-
-    for (index, ch) in digits.chars().rev().enumerate() {
-        if index > 0 && index % 3 == 0 {
-            grouped.push(',');
-        }
-        grouped.push(ch);
-    }
-
-    let grouped: String = grouped.chars().rev().collect();
-    format!("{sign}{grouped}")
 }
 
 fn number_text_for_value(value: &str) -> String {
@@ -681,7 +681,10 @@ mod tests {
 
     #[test]
     fn value_fallback_converts_digits_to_words() {
-        assert_eq!(number_text_for_value("-10.5"), "Negative One Zero Point Five");
+        assert_eq!(
+            number_text_for_value("-10.5"),
+            "Negative One Zero Point Five"
+        );
     }
 
     #[test]

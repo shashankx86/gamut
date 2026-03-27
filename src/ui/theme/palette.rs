@@ -1,5 +1,5 @@
-use iced::theme::Palette;
 use iced::Color;
+use iced::theme::Palette;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ThemePalette {

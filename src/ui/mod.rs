@@ -1,4 +1,5 @@
 mod constants;
+mod format;
 mod launcher;
 mod layout;
 mod styles;
@@ -12,15 +13,13 @@ use iced_layershell::daemon;
 use iced_layershell::settings::{LayerShellSettings, Settings, StartMode};
 use launcher::Launcher;
 use lucide_icons::LUCIDE_FONT_BYTES;
-use std::error::Error;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 
 use crate::core::app_command::AppCommand;
+use crate::core::error::DynError;
 use crate::core::tray::TrayController;
 use styles::launcher_base_style;
-
-type DynError = Box<dyn Error>;
 
 pub fn run_daemon(
     command_rx: Receiver<AppCommand>,

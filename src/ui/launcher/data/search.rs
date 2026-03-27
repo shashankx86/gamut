@@ -1,19 +1,27 @@
-use super::Launcher;
+use super::super::Launcher;
 use crate::core::desktop::{DesktopApp, normalize_query};
 use crate::core::search::{ApplicationSearchResponse, rank_applications};
 use log::error;
 
 impl Launcher {
-    pub(super) fn update_query(&mut self, query: String) {
+    pub(in crate::ui::launcher) fn bump_selection_revision(&mut self) {
         self.selection_revision = self.selection_revision.wrapping_add(1);
-        self.query = query;
-        self.normalized_query = normalize_query(&self.query);
-        self.search_generation = self.search_generation.wrapping_add(1);
-        self.search_in_flight = !self.normalized_query.is_empty();
+    }
+
+    pub(in crate::ui::launcher) fn reset_selection_cursor_state(&mut self) {
         self.selected_rank = 0;
         self.highlighted_rank = 0;
         self.results_scroll_offset = 0.0;
         self.scroll_start_rank = 0;
+    }
+
+    pub(in crate::ui::launcher) fn update_query(&mut self, query: String) {
+        self.bump_selection_revision();
+        self.query = query;
+        self.normalized_query = normalize_query(&self.query);
+        self.search_generation = self.search_generation.wrapping_add(1);
+        self.search_in_flight = !self.normalized_query.is_empty();
+        self.reset_selection_cursor_state();
         self.sync_results_target_with_query();
 
         if self.normalized_query.is_empty() {
@@ -25,21 +33,26 @@ impl Launcher {
         self.submit_search_request();
     }
 
-    pub(super) fn set_apps(&mut self, apps: Vec<DesktopApp>) {
-        self.selection_revision = self.selection_revision.wrapping_add(1);
+    pub(in crate::ui::launcher) fn set_apps(&mut self, apps: Vec<DesktopApp>) {
+        self.bump_selection_revision();
         self.apps = apps;
-        self.all_app_indices = (0..self.apps.len()).take(super::MAX_RESULTS).collect();
+        self.all_app_indices = (0..self.apps.len())
+            .take(crate::ui::constants::MAX_RESULTS)
+            .collect();
         self.search_in_flight = false;
         self.apply_search_results_sync();
         let _ = self.app_search_engine.replace_apps(&self.apps);
     }
 
     #[cfg(test)]
-    pub(super) fn app_count(&self) -> usize {
+    pub(in crate::ui::launcher) fn app_count(&self) -> usize {
         self.apps.len()
     }
 
-    pub(super) fn apply_search_results(&mut self, response: ApplicationSearchResponse) -> bool {
+    pub(in crate::ui::launcher) fn apply_search_results(
+        &mut self,
+        response: ApplicationSearchResponse,
+    ) -> bool {
         if response.generation != self.search_generation {
             return false;
         }
@@ -51,7 +64,7 @@ impl Launcher {
         true
     }
 
-    pub(super) fn reset_search_state(&mut self) {
+    pub(in crate::ui::launcher) fn reset_search_state(&mut self) {
         self.query.clear();
         self.normalized_query.clear();
         self.filtered_indices = self.all_app_indices.clone();
@@ -61,7 +74,9 @@ impl Launcher {
         self.submit_search_request();
     }
 
-    pub(super) fn search_results_handle(&self) -> super::SearchResultsReceiverHandle {
+    pub(in crate::ui::launcher) fn search_results_handle(
+        &self,
+    ) -> super::super::SearchResultsReceiverHandle {
         self.search_results_handle.clone()
     }
 
@@ -76,14 +91,14 @@ impl Launcher {
 
         self.selected_rank = self.selected_rank.min(self.filtered_indices.len() - 1);
         self.highlighted_rank = self.highlighted_rank.min(self.filtered_indices.len() - 1);
-        self.results_scroll_offset = super::state::clamp_scroll_offset(
+        self.results_scroll_offset = super::super::display::state::clamp_scroll_offset(
             self.results_scroll_offset,
             self.filtered_indices.len(),
             self.layout.results_viewport_height(),
             self.layout.result_row_height,
             self.layout.result_row_gap,
         );
-        self.scroll_start_rank = super::state::scroll_start_for_offset(
+        self.scroll_start_rank = super::super::display::state::scroll_start_for_offset(
             self.results_scroll_offset,
             self.layout.result_row_scroll_step(),
             self.filtered_indices.len().saturating_sub(1),

@@ -1,43 +1,43 @@
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ProgressIndicatorMode {
+pub(in crate::ui::launcher) enum ProgressIndicatorMode {
     Hidden,
     Indeterminate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct ProgressContext {
-    pub(super) manual_expanded: bool,
-    pub(super) expanding: bool,
-    pub(super) collapsing: bool,
-    pub(super) search_in_flight: bool,
-    pub(super) app_refresh_in_flight: bool,
-    pub(super) icon_resolve_in_flight: bool,
+pub(in crate::ui::launcher) struct ProgressContext {
+    pub(in crate::ui::launcher) manual_expanded: bool,
+    pub(in crate::ui::launcher) expanding: bool,
+    pub(in crate::ui::launcher) collapsing: bool,
+    pub(in crate::ui::launcher) search_in_flight: bool,
+    pub(in crate::ui::launcher) app_refresh_in_flight: bool,
+    pub(in crate::ui::launcher) icon_resolve_in_flight: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct ProgressPolicy {
-    pub(super) enabled: bool,
-    pub(super) during_manual_expanded: bool,
-    pub(super) during_expand: bool,
-    pub(super) during_collapse: bool,
-    pub(super) during_search: bool,
-    pub(super) during_app_refresh: bool,
-    pub(super) during_icon_resolve: bool,
+pub(in crate::ui::launcher) struct ProgressPolicy {
+    pub(in crate::ui::launcher) enabled: bool,
+    pub(in crate::ui::launcher) during_manual_expanded: bool,
+    pub(in crate::ui::launcher) during_expand: bool,
+    pub(in crate::ui::launcher) during_collapse: bool,
+    pub(in crate::ui::launcher) during_search: bool,
+    pub(in crate::ui::launcher) during_app_refresh: bool,
+    pub(in crate::ui::launcher) during_icon_resolve: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct ProgressAnimationConfig {
-    pub(super) cycles_per_second: f32,
-    pub(super) rows_per_segment: f32,
-    pub(super) min_segment_px: f32,
-    pub(super) max_segment_ratio: f32,
-    pub(super) finish_current_sweep: bool,
+pub(in crate::ui::launcher) struct ProgressAnimationConfig {
+    pub(in crate::ui::launcher) cycles_per_second: f32,
+    pub(in crate::ui::launcher) rows_per_segment: f32,
+    pub(in crate::ui::launcher) min_segment_px: f32,
+    pub(in crate::ui::launcher) max_segment_ratio: f32,
+    pub(in crate::ui::launcher) finish_current_sweep: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct ProgressConfig {
+pub(in crate::ui::launcher) struct ProgressConfig {
     policy: ProgressPolicy,
     animation: ProgressAnimationConfig,
 }
@@ -49,7 +49,7 @@ impl Default for ProgressConfig {
 }
 
 impl ProgressConfig {
-    pub(super) const fn disabled() -> Self {
+    pub(in crate::ui::launcher) const fn disabled() -> Self {
         Self {
             policy: ProgressPolicy {
                 enabled: false,
@@ -70,7 +70,7 @@ impl ProgressConfig {
         }
     }
 
-    pub(super) const fn indexing_update_indeterminate() -> Self {
+    pub(in crate::ui::launcher) const fn indexing_update_indeterminate() -> Self {
         Self {
             policy: ProgressPolicy {
                 enabled: true,
@@ -91,7 +91,7 @@ impl ProgressConfig {
         }
     }
 
-    pub(super) fn mode(self, context: ProgressContext) -> ProgressIndicatorMode {
+    pub(in crate::ui::launcher) fn mode(self, context: ProgressContext) -> ProgressIndicatorMode {
         if !self.policy.enabled {
             return ProgressIndicatorMode::Hidden;
         }
@@ -109,15 +109,15 @@ impl ProgressConfig {
         }
     }
 
-    pub(super) fn is_enabled(self) -> bool {
+    pub(in crate::ui::launcher) fn is_enabled(self) -> bool {
         self.policy.enabled
     }
 
-    pub(super) fn animation(self) -> ProgressAnimationConfig {
+    pub(in crate::ui::launcher) fn animation(self) -> ProgressAnimationConfig {
         self.animation
     }
 
-    pub(super) fn segment_width(
+    pub(in crate::ui::launcher) fn segment_width(
         self,
         track_width: f32,
         row_height: f32,
@@ -143,13 +143,13 @@ impl ProgressConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(super) struct ProgressSegments {
-    pub(super) leading_track: f32,
-    pub(super) active: f32,
+pub(in crate::ui::launcher) struct ProgressSegments {
+    pub(in crate::ui::launcher) leading_track: f32,
+    pub(in crate::ui::launcher) active: f32,
 }
 
 #[derive(Debug, Clone)]
-pub(super) struct ProgressIndicator {
+pub(in crate::ui::launcher) struct ProgressIndicator {
     phase: f32,
     active_sequence: u64,
     last_tick_at: Option<Instant>,
@@ -168,7 +168,7 @@ impl Default for ProgressIndicator {
 }
 
 impl ProgressIndicator {
-    pub(super) fn tick(
+    pub(in crate::ui::launcher) fn tick(
         &mut self,
         mode: ProgressIndicatorMode,
         animation: ProgressAnimationConfig,
@@ -211,7 +211,7 @@ impl ProgressIndicator {
         }
     }
 
-    pub(super) fn needs_animation(
+    pub(in crate::ui::launcher) fn needs_animation(
         &self,
         mode: ProgressIndicatorMode,
         animation: ProgressAnimationConfig,
@@ -222,7 +222,7 @@ impl ProgressIndicator {
         }
     }
 
-    pub(super) fn segments(
+    pub(in crate::ui::launcher) fn segments(
         &self,
         mode: ProgressIndicatorMode,
         track_width: f32,

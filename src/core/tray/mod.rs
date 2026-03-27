@@ -6,14 +6,12 @@ mod linux;
 #[cfg(not(target_os = "linux"))]
 mod unsupported;
 
-use std::error::Error;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 
 use crate::core::app_command::AppCommand;
+use crate::core::error::DynError;
 use crate::core::preferences::AppPreferences;
-
-type DynError = Box<dyn Error>;
 
 #[derive(Clone)]
 pub(crate) struct TrayController {

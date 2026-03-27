@@ -1,5 +1,5 @@
-use super::receiver::{app_command_stream, ipc_command_stream, search_results_stream};
-use super::{Launcher, Message};
+use super::super::{Launcher, Message, channel};
+use channel::{app_command_stream, ipc_command_stream, search_results_stream};
 use iced::{Event, Subscription, event, time, window};
 use std::time::Duration;
 

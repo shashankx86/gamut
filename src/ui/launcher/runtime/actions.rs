@@ -1,13 +1,13 @@
-use super::super::constants::UNFOCUS_GUARD_MS;
-use super::super::surface::launcher_visible_surface_settings;
-use super::{Launcher, Message};
-use iced::{window, Task};
+use super::super::{Launcher, Message};
+use crate::ui::constants::UNFOCUS_GUARD_MS;
+use crate::ui::surface::launcher_visible_surface_settings;
+use iced::{Task, window};
 use log::error;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 impl Launcher {
-    pub(super) fn expand_results(&mut self) -> Task<Message> {
+    pub(in crate::ui::launcher) fn expand_results(&mut self) -> Task<Message> {
         if self.normalized_query.is_empty() && self.results_target == 0.0 {
             self.results_target = 1.0;
             self.manually_expanded = true;
@@ -16,7 +16,7 @@ impl Launcher {
         Task::none()
     }
 
-    pub(super) fn launch(&mut self, index: usize) -> Task<Message> {
+    pub(in crate::ui::launcher) fn launch(&mut self, index: usize) -> Task<Message> {
         let Some(app) = self.apps.get(index) else {
             return Task::none();
         };
@@ -30,7 +30,7 @@ impl Launcher {
         }
     }
 
-    pub(super) fn show_launcher(&mut self) -> Task<Message> {
+    pub(in crate::ui::launcher) fn show_launcher(&mut self) -> Task<Message> {
         if self.is_visible {
             return Task::none();
         }
@@ -45,7 +45,7 @@ impl Launcher {
         ])
     }
 
-    pub(super) fn hide_launcher(&mut self) -> Task<Message> {
+    pub(in crate::ui::launcher) fn hide_launcher(&mut self) -> Task<Message> {
         if !self.is_visible {
             return Task::none();
         }
@@ -60,7 +60,7 @@ impl Launcher {
         }
     }
 
-    pub(super) fn recreate_launcher_surface(&mut self) -> Task<Message> {
+    pub(in crate::ui::launcher) fn recreate_launcher_surface(&mut self) -> Task<Message> {
         let previous_window_id = self.launcher_window_id;
         let new_window_id = window::Id::unique();
         self.launcher_window_id = Some(new_window_id);
@@ -85,12 +85,12 @@ impl Launcher {
         Task::batch(tasks)
     }
 
-    pub(super) fn should_ignore_unfocus(&self) -> bool {
+    pub(in crate::ui::launcher) fn should_ignore_unfocus(&self) -> bool {
         self.ignore_unfocus_until
             .is_some_and(|deadline| Instant::now() < deadline)
     }
 
-    pub(super) fn arm_unfocus_guard(&mut self) {
+    pub(in crate::ui::launcher) fn arm_unfocus_guard(&mut self) {
         self.ignore_unfocus_until = Some(Instant::now() + Duration::from_millis(UNFOCUS_GUARD_MS));
     }
 }
