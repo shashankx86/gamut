@@ -1,7 +1,7 @@
 use super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
-use iced::Task;
+use iced::{Task, clipboard};
 use log::{error, info};
 
 impl Launcher {
@@ -30,7 +30,9 @@ impl Launcher {
                 self.scroll_to_selected(self.selected_rank, true)
             }
             Message::LaunchFirstMatch => {
-                if let Some(index) = self.selected_result_index() {
+                if let Some(calculation_preview) = self.calculation_preview() {
+                    clipboard::write(calculation_preview.formatted_value)
+                } else if let Some(index) = self.selected_result_index() {
                     self.launch(index)
                 } else {
                     Task::none()

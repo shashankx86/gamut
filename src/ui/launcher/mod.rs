@@ -1,4 +1,5 @@
 mod actions;
+mod calculator;
 mod input;
 mod progress;
 mod receiver;
@@ -272,6 +273,10 @@ impl Launcher {
         &self.filtered_indices
     }
 
+    pub(super) fn calculation_preview(&self) -> Option<calculator::CalculationPreview> {
+        calculator::calculation_preview(&self.query)
+    }
+
     fn clear_window_state(&mut self) {
         self.selection_revision = self.selection_revision.wrapping_add(1);
         self.reset_search_state();
@@ -319,6 +324,10 @@ impl Launcher {
     }
 
     pub(super) fn selected_result_index(&self) -> Option<usize> {
+        if self.calculation_preview().is_some() {
+            return None;
+        }
+
         if !self.normalized_query.is_empty()
             && self.applied_search_generation != self.search_generation
         {
@@ -421,7 +430,7 @@ impl Launcher {
     }
 
     pub(super) fn request_icon_resolution_for_visible(&mut self) -> Task<Message> {
-        if !self.is_visible || self.icon_resolve_in_flight {
+        if !self.is_visible || self.icon_resolve_in_flight || self.calculation_preview().is_some() {
             return Task::none();
         }
 

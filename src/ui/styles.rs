@@ -128,6 +128,49 @@ pub(super) fn result_button_style(
     }
 }
 
+pub(super) fn calculator_card_style(
+    layout: &LauncherLayout,
+    appearance: &ResolvedAppearance,
+) -> container::Style {
+    container::Style {
+        text_color: Some(appearance.primary_text),
+        background: Some(Background::Color(Color {
+            a: if appearance.panel_background.r > 0.5 {
+                0.05
+            } else {
+                0.1
+            },
+            ..appearance.panel_background
+        })),
+        border: Border {
+            color: appearance.panel_border,
+            width: 1.0,
+            radius: layout.item_radius.into(),
+        },
+        ..container::Style::default()
+    }
+}
+
+pub(super) fn calculator_divider_style(appearance: &ResolvedAppearance) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(appearance.panel_border)),
+        ..container::Style::default()
+    }
+}
+
+pub(super) fn calculator_badge_style(appearance: &ResolvedAppearance) -> container::Style {
+    container::Style {
+        text_color: Some(appearance.muted_text),
+        background: Some(Background::Color(appearance.first_row_active)),
+        border: Border {
+            color: appearance.accent_soft,
+            width: 1.0,
+            radius: 5.0.into(),
+        },
+        ..container::Style::default()
+    }
+}
+
 pub(super) fn results_scroll_style(
     theme: &Theme,
     appearance: &ResolvedAppearance,

@@ -1,6 +1,7 @@
 use super::launcher::{Launcher, Message};
 use super::styles::{
     backdrop_style, bottom_strip_style, panel_style, progress_line_segment_style,
+    calculator_badge_style, calculator_card_style, calculator_divider_style,
     result_button_style, results_scroll_style, search_input_style,
 };
 use crate::core::desktop::{trim_label, DesktopApp};
@@ -16,6 +17,10 @@ const BOTTOM_STRIP_ICON_BUTTON_SIZE: f32 = 20.0;
 const BOTTOM_STRIP_ICON_SIZE: f32 = 12.0;
 const RESULT_META_LABEL_WIDTH: f32 = 96.0;
 const RESULT_META_TEXT_MIN_SIZE: f32 = 10.0;
+const CALC_MIN_HEADLINE_CHARS: usize = 18;
+const CALC_MAX_HEADLINE_CHARS: usize = 56;
+const CALC_MIN_BADGE_CHARS: usize = 20;
+const CALC_MAX_BADGE_CHARS: usize = 72;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BottomStripAction {
@@ -96,9 +101,25 @@ impl Launcher {
         let mut results = column![]
             .spacing(self.layout.result_row_gap)
             .width(Length::Fill);
+        let calculation_preview = self.calculation_preview();
         let filtered = self.filtered_indices();
 
-        if filtered.is_empty() && !self.search_in_flight {
+        if let Some(preview) = calculation_preview {
+            results = results.push(
+                container(
+                    text("Calculator")
+                        .size(self.layout.result_secondary_text_size)
+                        .color(appearance.muted_text),
+                )
+                .width(Length::Fill)
+                .padding([0, 4]),
+            );
+            results = results.push(self.view_calculation_row(
+                preview.expression,
+                preview.formatted_value,
+                preview.words,
+            ));
+        } else if filtered.is_empty() && !self.search_in_flight {
             results = results.push(
                 container(
                     text("No applications found")
@@ -220,9 +241,96 @@ impl Launcher {
         .into()
     }
 
+    fn view_calculation_row(
+        &self,
+        expression: String,
+        formatted_value: String,
+        words: Option<String>,
+    ) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let badge_size = (self.layout.result_secondary_text_size - 1.0).max(10.0);
+        let headline_size = self.layout.result_primary_text_size + 4.0;
+        let headline_max_chars = self.calculation_headline_max_chars();
+        let badge_max_chars = self.calculation_badge_max_chars();
+        let expression = truncate_middle_with_ellipsis(&expression, headline_max_chars);
+        let formatted_value = normalize_result_display_value(&formatted_value);
+        let formatted_value = truncate_middle_with_ellipsis(&formatted_value, headline_max_chars);
+        let value_caption = words
+            .unwrap_or_else(|| number_text_for_value(&formatted_value))
+            .to_string();
+        let value_caption = truncate_middle_with_ellipsis(&value_caption, badge_max_chars);
+
+        let left = column![
+            text(expression)
+                .width(Length::Fill)
+                .align_x(iced::alignment::Horizontal::Center)
+                .size(headline_size)
+                .color(appearance.primary_text),
+            container(text("Question").size(badge_size).color(appearance.muted_text))
+                .padding([2, 8])
+                .style(move |_| calculator_badge_style(&appearance)),
+        ]
+        .spacing(6)
+        .width(Length::Fill)
+        .align_x(iced::alignment::Horizontal::Center);
+
+        let right = column![
+            text(formatted_value)
+                .width(Length::Fill)
+                .align_x(iced::alignment::Horizontal::Center)
+                .size(headline_size)
+                .color(appearance.primary_text),
+            container(text(value_caption).size(badge_size).color(appearance.muted_text))
+                .padding([2, 8])
+                .style(move |_| calculator_badge_style(&appearance)),
+        ]
+        .spacing(6)
+        .width(Length::Fill)
+        .align_x(iced::alignment::Horizontal::Center);
+
+        let card = row![
+            container(left)
+                .width(Length::FillPortion(1))
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+            container("")
+                .width(1)
+                .height(Length::Fill)
+                .style(move |_| calculator_divider_style(&appearance)),
+            container(right)
+                .width(Length::FillPortion(1))
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+        ]
+        .spacing(12)
+        .align_y(iced::alignment::Vertical::Center)
+        .height(Length::Fill);
+
+        container(container(card)
+            .padding([16, 18])
+            .style(move |_| calculator_card_style(&self.layout, &appearance)))
+        .width(Length::Fill)
+        .height(Length::Fixed((self.layout.result_row_height * 1.9).max(108.0)))
+        .padding([self.layout.result_row_inset_y as u16, 0])
+        .into()
+    }
+
+    fn calculation_headline_max_chars(&self) -> usize {
+        ((self.layout.panel_width / 22.0).floor() as usize)
+            .clamp(CALC_MIN_HEADLINE_CHARS, CALC_MAX_HEADLINE_CHARS)
+    }
+
+    fn calculation_badge_max_chars(&self) -> usize {
+        ((self.layout.panel_width / 16.0).floor() as usize)
+            .clamp(CALC_MIN_BADGE_CHARS, CALC_MAX_BADGE_CHARS)
+    }
+
     fn view_bottom_strip(&self) -> Element<'_, Message> {
         let appearance = self.resolved_appearance();
         let shadcn_theme = bottom_strip_shadcn_theme(&appearance);
+        let calculator_active = self.calculation_preview().is_some();
         let (label_text, icon_button) = if self.query.is_empty() && self.results_target == 0.0 {
             (
                 "Show more",
@@ -234,7 +342,7 @@ impl Launcher {
             )
         } else {
             (
-                "Open",
+                if calculator_active { "Copy Result" } else { "Open" },
                 action_icon_button(
                     icon_corner_down_left().size(BOTTOM_STRIP_ICON_SIZE),
                     &shadcn_theme,
@@ -418,6 +526,97 @@ fn action_icon_button<'a>(
     .height(Length::Fixed(BOTTOM_STRIP_ICON_BUTTON_SIZE))
 }
 
+fn truncate_middle_with_ellipsis(value: &str, max_chars: usize) -> String {
+    if max_chars <= 3 {
+        return "...".to_string();
+    }
+
+    let char_count = value.chars().count();
+    if char_count <= max_chars {
+        return value.to_string();
+    }
+
+    let visible = max_chars.saturating_sub(3);
+    let left_count = visible / 2;
+    let right_count = visible.saturating_sub(left_count);
+
+    let left: String = value.chars().take(left_count).collect();
+    let right: String = value
+        .chars()
+        .skip(char_count.saturating_sub(right_count))
+        .collect();
+
+    let mut output = left;
+    output.push_str("...");
+    output.push_str(&right);
+    output
+}
+
+fn normalize_result_display_value(value: &str) -> String {
+    let cleaned: String = value.chars().filter(|ch| *ch != ',').collect();
+
+    if let Ok(integer) = cleaned.parse::<i128>() {
+        return format_i128_with_grouping(integer);
+    }
+
+    if let Some((integer, fraction)) = cleaned.split_once('.')
+        && let Ok(integer) = integer.parse::<i128>()
+    {
+        return format!("{}.{}", format_i128_with_grouping(integer), fraction);
+    }
+
+    value.to_string()
+}
+
+fn format_i128_with_grouping(value: i128) -> String {
+    let sign = if value < 0 { "-" } else { "" };
+    let digits = value.abs().to_string();
+    let mut grouped = String::new();
+
+    for (index, ch) in digits.chars().rev().enumerate() {
+        if index > 0 && index % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+
+    let grouped: String = grouped.chars().rev().collect();
+    format!("{sign}{grouped}")
+}
+
+fn number_text_for_value(value: &str) -> String {
+    let mut parts = Vec::new();
+
+    for ch in value.chars() {
+        let part = match ch {
+            '0' => Some("Zero"),
+            '1' => Some("One"),
+            '2' => Some("Two"),
+            '3' => Some("Three"),
+            '4' => Some("Four"),
+            '5' => Some("Five"),
+            '6' => Some("Six"),
+            '7' => Some("Seven"),
+            '8' => Some("Eight"),
+            '9' => Some("Nine"),
+            '-' => Some("Negative"),
+            '.' => Some("Point"),
+            ',' => None,
+            _ => None,
+        };
+
+        if let Some(part) = part {
+            parts.push(part);
+        }
+    }
+
+    if parts.is_empty() {
+        "Result".to_string()
+    } else {
+        parts.join(" ")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,5 +671,22 @@ mod tests {
             launcher.results_top_spacer_height(),
             launcher.layout.result_row_height
         );
+    }
+
+    #[test]
+    fn truncation_uses_middle_three_dot_ellipsis() {
+        assert_eq!(truncate_middle_with_ellipsis("abcdef", 5), "a...f");
+        assert_eq!(truncate_middle_with_ellipsis("abc", 5), "abc");
+    }
+
+    #[test]
+    fn value_fallback_converts_digits_to_words() {
+        assert_eq!(number_text_for_value("-10.5"), "Negative One Zero Point Five");
+    }
+
+    #[test]
+    fn result_display_is_grouped_with_commas() {
+        assert_eq!(normalize_result_display_value("1234567"), "1,234,567");
+        assert_eq!(normalize_result_display_value("1234567.89"), "1,234,567.89");
     }
 }
