@@ -13,8 +13,8 @@ use super::styles::{
 };
 use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::{
-    Space, button, column, container, float, image, keyed_column, opaque, row, rule, scrollable,
-    space, stack, svg, text, tooltip,
+    button, column, container, float, image, keyed_column, opaque, row, rule, scrollable, space,
+    stack, svg, text, tooltip,
 };
 use iced::{Element, Length, Padding, window};
 use iced_shadcn::{
@@ -33,12 +33,13 @@ const BOTTOM_STRIP_ICON_SIZE: f32 = 12.0;
 const RESULT_META_LABEL_WIDTH: f32 = 96.0;
 const RESULT_META_TEXT_MIN_SIZE: f32 = 10.0;
 const ACTION_CARD_MIN_WIDTH: f32 = 260.0;
+const ACTION_CARD_MIN_COMPACT_WIDTH: f32 = 180.0;
 const CALC_MIN_HEADLINE_CHARS: usize = 18;
 const CALC_MAX_HEADLINE_CHARS: usize = 56;
 const CALC_MIN_BADGE_CHARS: usize = 20;
 const CALC_MAX_BADGE_CHARS: usize = 72;
-const ACTION_OVERLAY_RIGHT_OFFSET: f32 = 19.0;
-const ACTION_OVERLAY_BOTTOM_OFFSET: f32 = 12.0;
+const ACTION_OVERLAY_RIGHT_OFFSET: f32 = 30.0;
+const ACTION_OVERLAY_BOTTOM_OFFSET: f32 = 16.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BottomStripAction {
@@ -146,7 +147,14 @@ fn action_icon_button<'a>(
     icon: impl Into<Element<'a, Message>>,
     theme: &ShadcnTheme,
     action: BottomStripAction,
+    is_active: bool,
 ) -> iced::widget::button::Button<'a, Message> {
+    let variant = if is_active {
+        ButtonVariant::Secondary
+    } else {
+        ButtonVariant::Outline
+    };
+
     icon_button(
         icon,
         Some(match action {
@@ -155,7 +163,7 @@ fn action_icon_button<'a>(
             BottomStripAction::ToggleActions => Message::ActionButtonPressed,
         }),
         ButtonProps::new()
-            .variant(ButtonVariant::Outline)
+            .variant(variant)
             .radius(ButtonRadius::Small)
             .size(ButtonSize::Size1),
         theme,
