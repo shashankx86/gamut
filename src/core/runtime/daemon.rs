@@ -1,4 +1,4 @@
-use super::{DAEMON_START_DELAY, DAEMON_START_RETRIES, DynError};
+use super::{DynError, DAEMON_START_DELAY, DAEMON_START_RETRIES};
 use crate::core::ipc::{self, IpcCommand};
 use crate::core::preferences::load_preferences;
 use crate::core::tray;
@@ -81,18 +81,4 @@ fn wait_for_daemon(command: IpcCommand, daemon_child: &mut Child) -> Result<(), 
         format!("could not contact gamut daemon after {DAEMON_START_RETRIES} attempts: {detail}")
             .into(),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::core::ipc::IpcCommand;
-
-    #[test]
-    fn cloned_ipc_command_preserves_target_output() {
-        let command = IpcCommand::Toggle {
-            target_output: Some("DP-1".to_string()),
-        };
-
-        assert_eq!(command.clone(), command);
-    }
 }

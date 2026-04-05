@@ -1,7 +1,7 @@
 mod command;
 mod output;
 
-pub use command::{CliCommand, CliMode, HelpTopic, parse_command};
+pub use command::{parse_command, CliCommand, CliMode, HelpTopic};
 pub use output::{print_help, print_version};
 
 #[cfg(test)]
@@ -13,7 +13,9 @@ mod tests {
         let help = help_text();
 
         assert!(help.contains("config"));
-        assert!(help.contains("gamut [OPTIONS] [COMMAND]"));
+        assert!(help.contains("Usage:"));
+        assert!(help.contains("Commands:"));
+        assert!(help.contains("toggle"));
     }
 
     #[test]
@@ -21,7 +23,8 @@ mod tests {
         let help = config_help_text();
 
         assert!(help.contains("shortcut"));
-        assert!(help.contains("config set"));
+        assert!(help.contains("set <key> <value>"));
+        assert!(help.contains("reset <key>|all"));
     }
 
     #[test]
@@ -29,7 +32,8 @@ mod tests {
         let help = shortcut_help_text();
 
         assert!(help.contains("interactive"));
-        assert!(help.contains("Ctrl+K"));
+        assert!(help.contains("Modifier+Key"));
+        assert!(help.contains("move-down"));
     }
 
     #[test]

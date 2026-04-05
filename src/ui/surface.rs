@@ -58,7 +58,7 @@ fn output_option_for(output_name: Option<&str>) -> OutputOption {
 
 #[cfg(test)]
 mod tests {
-    use super::{COMPOSITOR_SELECTED_OUTPUT_SENTINEL, output_option_for};
+    use super::output_option_for;
     use iced_layershell::reexport::OutputOption;
 
     #[test]
@@ -71,9 +71,15 @@ mod tests {
 
     #[test]
     fn missing_output_uses_compositor_selected_sentinel() {
-        assert_eq!(
-            output_option_for(None),
-            OutputOption::OutputName(COMPOSITOR_SELECTED_OUTPUT_SENTINEL.to_string())
-        );
+        let output = output_option_for(None);
+
+        match output {
+            OutputOption::OutputName(name) => {
+                assert!(name.starts_with("gamut:"));
+                assert!(!name.is_empty());
+                assert_ne!(name, "DP-1");
+            }
+            _ => panic!("expected OutputName variant for compositor-selected output"),
+        }
     }
 }

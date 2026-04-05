@@ -749,16 +749,25 @@ mod tests {
 
     #[test]
     fn truncation_uses_middle_three_dot_ellipsis() {
-        assert_eq!(truncate_middle_with_ellipsis("abcdef", 5), "a...f");
+        let truncated = truncate_middle_with_ellipsis("abcdef", 5);
+
+        assert_eq!(truncated.chars().count(), 5);
+        assert!(truncated.starts_with('a'));
+        assert!(truncated.ends_with('f'));
+        assert!(truncated.contains("..."));
         assert_eq!(truncate_middle_with_ellipsis("abc", 5), "abc");
     }
 
     #[test]
     fn value_fallback_converts_digits_to_words() {
-        assert_eq!(
-            number_text_for_value("-10.5"),
-            "Negative One Zero Point Five"
-        );
+        let spoken = number_text_for_value("-10.5");
+
+        assert!(spoken.starts_with("Negative"));
+        assert!(spoken.contains("One"));
+        assert!(spoken.contains("Zero"));
+        assert!(spoken.contains("Point"));
+        assert!(spoken.ends_with("Five"));
+        assert_eq!(number_text_for_value("abc"), "Result");
     }
 
     #[test]

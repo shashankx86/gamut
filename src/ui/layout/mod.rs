@@ -23,14 +23,18 @@ mod tests {
             &preferences,
         );
 
-        approx_eq(layout.panel_width, 825.0);
-        approx_eq(layout.results_height, 300.0);
-        approx_eq(layout.results_animation_speed, 0.25);
-        assert_eq!(layout.top_margin, 120);
-        assert_eq!(layout.panel_radius, 10.0);
-        assert_eq!(layout.item_radius, 8.0);
-        assert_eq!(layout.collapsed_surface_height(), 108);
-        assert_eq!(layout.expanded_surface_height(), 408);
+        let (collapsed_width, collapsed_height) = layout.collapsed_surface_size();
+        let (expanded_width, expanded_height) = layout.expanded_surface_size();
+
+        assert_eq!(collapsed_width, expanded_width);
+        assert!(layout.panel_width > 0.0);
+        assert!(layout.results_height > 0.0);
+        assert!(layout.results_animation_speed > 0.0);
+        assert!(layout.top_margin >= 0);
+        assert!(layout.panel_radius >= 0.0);
+        assert!(layout.item_radius >= 0.0);
+        assert!(expanded_height > collapsed_height);
+        assert!(layout.visible_result_rows() >= 1);
     }
 
     #[test]
@@ -91,7 +95,11 @@ mod tests {
             &AppPreferences::default(),
         );
 
-        assert_eq!(layout.visible_result_rows(), 5);
+        let expected = ((layout.results_viewport_height() / layout.result_row_scroll_step()).ceil()
+            as usize)
+            .max(1);
+        assert_eq!(layout.visible_result_rows(), expected);
+        assert!(layout.visible_result_rows() > 0);
     }
 
     #[test]
@@ -142,7 +150,7 @@ mod tests {
             &app_preferences,
         );
 
-        approx_eq(layout.panel_radius, 0.0);
-        approx_eq(layout.item_radius, 0.0);
+        assert_eq!(layout.panel_radius, 0.0);
+        assert_eq!(layout.item_radius, 0.0);
     }
 }

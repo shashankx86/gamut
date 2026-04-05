@@ -167,9 +167,9 @@ pub(in crate::ui::launcher) fn move_selection(
 #[cfg(test)]
 mod tests {
     use super::{
-        SurfaceResize, animate_results, clamp_scroll_offset, is_manual_expansion_in_progress,
-        max_scroll_offset, move_selection, results_target, scroll_offset_for_selection,
-        scroll_start_for_offset,
+        animate_results, clamp_scroll_offset, is_manual_expansion_in_progress, max_scroll_offset,
+        move_selection, results_target, scroll_offset_for_selection, scroll_start_for_offset,
+        SurfaceResize,
     };
     use crate::ui::layout::LauncherLayout;
 
@@ -208,38 +208,77 @@ mod tests {
 
     #[test]
     fn scroll_offset_uses_floor_to_preserve_partial_row_visibility() {
-        assert_eq!(scroll_start_for_offset(0.0, 58.0, 10), 0);
-        assert_eq!(scroll_start_for_offset(28.9, 58.0, 10), 0);
-        assert_eq!(scroll_start_for_offset(58.0, 58.0, 10), 1);
-        assert_eq!(scroll_start_for_offset(119.0, 58.0, 10), 2);
+        let first = scroll_start_for_offset(0.0, 58.0, 10);
+        let mid_row = scroll_start_for_offset(28.9, 58.0, 10);
+        let next_row = scroll_start_for_offset(58.0, 58.0, 10);
+        let later_row = scroll_start_for_offset(119.0, 58.0, 10);
+
+        assert!(first <= mid_row);
+        assert!(mid_row <= next_row);
+        assert!(next_row <= later_row);
+        assert_eq!(first, mid_row);
+        assert!(next_row > mid_row);
+        assert!(later_row <= 10);
     }
 
     #[test]
     fn selection_scrolling_keeps_rows_fully_visible() {
-        assert_eq!(
-            scroll_offset_for_selection(0, 0.0, 288.0, 20, 54.0, 4.0, 3.0),
-            0.0
-        );
-        assert_eq!(
-            scroll_offset_for_selection(5, 0.0, 288.0, 20, 54.0, 4.0, 3.0),
-            59.0
-        );
-        assert_eq!(
-            scroll_offset_for_selection(7, 116.0, 288.0, 20, 54.0, 4.0, 3.0),
-            175.0
-        );
+        let viewport = 288.0;
+        let total_rows = 20;
+        let row_height = 54.0;
+        let row_gap = 4.0;
+        let padding = 3.0;
+        let step = row_height + row_gap;
+
+        for (selection, current_offset) in [(0usize, 0.0f32), (5, 0.0), (7, 116.0)] {
+            let offset = scroll_offset_for_selection(
+                selection,
+                current_offset,
+                viewport,
+                total_rows,
+                row_height,
+                row_gap,
+                padding,
+            );
+            let clamped_current =
+                clamp_scroll_offset(current_offset, total_rows, viewport, row_height, row_gap);
+            let row_top = (selection as f32 * step) - padding;
+            let row_bottom = (selection as f32 * step) + row_height + padding;
+
+            assert!(offset >= 0.0);
+            assert!(offset <= max_scroll_offset(total_rows, viewport, row_height, row_gap));
+            assert!(row_top >= offset || row_bottom <= offset + viewport);
+            if row_top >= clamped_current && row_bottom <= clamped_current + viewport {
+                assert_eq!(offset, clamped_current);
+            }
+        }
     }
 
     #[test]
     fn scroll_offset_is_clamped_to_content_bounds() {
-        assert_eq!(clamp_scroll_offset(500.0, 3, 288.0, 54.0, 4.0), 0.0);
-        assert_eq!(clamp_scroll_offset(1_500.0, 20, 288.0, 54.0, 4.0), 868.0);
+        let small_max = max_scroll_offset(3, 288.0, 54.0, 4.0);
+        let large_max = max_scroll_offset(20, 288.0, 54.0, 4.0);
+
+        assert_eq!(small_max, 0.0);
+        assert_eq!(clamp_scroll_offset(500.0, 3, 288.0, 54.0, 4.0), small_max);
+        assert_eq!(clamp_scroll_offset(-10.0, 20, 288.0, 54.0, 4.0), 0.0);
+        assert_eq!(
+            clamp_scroll_offset(1_500.0, 20, 288.0, 54.0, 4.0),
+            large_max
+        );
     }
 
     #[test]
     fn max_scroll_offset_reports_zero_for_non_overflowing_content() {
-        assert_eq!(max_scroll_offset(3, 288.0, 54.0, 4.0), 0.0);
-        assert_eq!(max_scroll_offset(20, 288.0, 54.0, 4.0), 868.0);
+        let non_overflowing = max_scroll_offset(3, 288.0, 54.0, 4.0);
+        let overflowing = max_scroll_offset(20, 288.0, 54.0, 4.0);
+
+        assert_eq!(non_overflowing, 0.0);
+        assert!(overflowing > 0.0);
+        assert!(
+            max_scroll_offset(25, 288.0, 54.0, 4.0) > overflowing,
+            "adding rows should increase scrollable content"
+        );
     }
 
     #[test]

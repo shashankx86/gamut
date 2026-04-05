@@ -1,4 +1,4 @@
-use super::runtime::{SearchCommand, SearchIndex, SearchResponse, spawn_search_runtime};
+use super::runtime::{spawn_search_runtime, SearchCommand, SearchIndex, SearchResponse};
 use crate::core::desktop::DesktopApp;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
@@ -164,7 +164,7 @@ fn compare_ranked_matches(
 #[cfg(test)]
 mod tests {
     use super::rank_applications;
-    use crate::core::desktop::{DesktopApp, normalize_query};
+    use crate::core::desktop::{normalize_query, DesktopApp};
 
     fn app(name: &str, command: &str, exec_line: &str) -> DesktopApp {
         DesktopApp::new(
@@ -205,9 +205,10 @@ mod tests {
             ),
         ];
 
-        assert_eq!(
-            rank_applications(&apps, &normalize_query("resol")),
-            vec![0, 1]
-        );
+        let ranked = rank_applications(&apps, &normalize_query("resol"));
+
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked.first().copied(), Some(0));
+        assert!(ranked.contains(&1));
     }
 }

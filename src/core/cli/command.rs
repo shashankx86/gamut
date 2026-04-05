@@ -378,7 +378,7 @@ fn shortcut_help_topic(value: &str) -> Result<HelpTopic, CliError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CliCommand, CliError, CliMode, HelpTopic, parse_command};
+    use super::{parse_command, CliCommand, CliError, CliMode, HelpTopic};
     use crate::core::preferences::{
         ConfigCommand, ConfigKey, ConfigResetTarget, ShortcutAction, ShortcutConfigCommand,
     };

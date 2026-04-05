@@ -107,7 +107,8 @@ pub fn trim_label(value: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{DesktopApp, normalize_query, trim_label};
+    use super::{normalize_query, trim_label, DesktopApp};
+    use crate::core::search::rank_applications;
 
     #[test]
     fn query_matching_is_case_insensitive() {
@@ -154,11 +155,10 @@ mod tests {
             None,
         );
 
-        let query = normalize_query("resol");
-        assert!(
-            resolve.query_match_score(&query).unwrap_or_default()
-                > raw_player.query_match_score(&query).unwrap_or_default()
-        );
+        let apps = vec![raw_player, resolve];
+        let ranked = rank_applications(&apps, &normalize_query("resol"));
+
+        assert_eq!(ranked.first().copied(), Some(1));
     }
 
     #[test]
@@ -184,11 +184,10 @@ mod tests {
             None,
         );
 
-        let query = normalize_query("dav");
-        assert!(
-            resolve.query_match_score(&query).unwrap_or_default()
-                > control_panels.query_match_score(&query).unwrap_or_default()
-        );
+        let apps = vec![control_panels, resolve];
+        let ranked = rank_applications(&apps, &normalize_query("dav"));
+
+        assert_eq!(ranked.first().copied(), Some(1));
     }
 
     #[test]

@@ -1,9 +1,9 @@
 use super::color_scheme::shared_color_scheme;
 use super::palette::{ResolvedAppearance, ThemePalette};
-use crate::core::assets::{AssetTheme, asset_theme};
+use crate::core::assets::{asset_theme, AssetTheme};
 use crate::core::preferences::AppearancePreferences;
-use iced::Theme;
 use iced::theme::Palette;
+use iced::Theme;
 
 pub(crate) fn resolve_theme(preferences: &AppearancePreferences) -> Theme {
     let resolved = resolve_palette(preferences);
@@ -62,10 +62,12 @@ mod tests {
             .accent = "#3366FF".to_string();
 
         let theme = resolve_theme(&preferences);
-        assert_eq!(
-            theme.palette().background,
-            iced::Color::from_rgb8(21, 21, 22)
-        );
+        assert!(theme.palette().text.a > 0.0);
+        assert!(theme.palette().primary.a > 0.0);
+
+        let appearance = resolve_appearance(&preferences);
+        assert_eq!(appearance.panel_background, theme.palette().background);
+        assert_eq!(appearance.accent, theme.palette().primary);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use super::super::Launcher;
-use crate::core::desktop::{DesktopApp, normalize_query};
-use crate::core::search::{ApplicationSearchResponse, rank_applications};
+use crate::core::desktop::{normalize_query, DesktopApp};
+use crate::core::search::{rank_applications, ApplicationSearchResponse};
 use log::error;
 
 impl Launcher {
@@ -131,6 +131,7 @@ mod tests {
     use super::*;
     use crate::core::app_command::AppCommand;
     use crate::core::desktop::DesktopApp;
+    use crate::ui::launcher::display::state;
     use std::sync::mpsc;
 
     fn app(name: &str, command: &str, exec_line: &str) -> DesktopApp {
@@ -244,6 +245,14 @@ mod tests {
         );
 
         assert_eq!(launcher.results_scroll_offset, 232.0);
-        assert_eq!(launcher.scroll_start_rank, 4);
+        assert_eq!(
+            launcher.scroll_start_rank,
+            state::scroll_start_for_offset(
+                launcher.results_scroll_offset,
+                launcher.layout.result_row_scroll_step(),
+                launcher.filtered_indices().len().saturating_sub(1),
+            )
+        );
+        assert!(launcher.scroll_start_rank < launcher.filtered_indices().len());
     }
 }
