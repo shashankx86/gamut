@@ -107,7 +107,7 @@ pub fn trim_label(value: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_query, trim_label, DesktopApp};
+    use super::{DesktopApp, normalize_query, trim_label};
     use crate::core::search::rank_applications;
 
     #[test]
