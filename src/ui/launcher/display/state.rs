@@ -167,9 +167,9 @@ pub(in crate::ui::launcher) fn move_selection(
 #[cfg(test)]
 mod tests {
     use super::{
-        animate_results, clamp_scroll_offset, is_manual_expansion_in_progress, max_scroll_offset,
-        move_selection, results_target, scroll_offset_for_selection, scroll_start_for_offset,
-        SurfaceResize,
+        SurfaceResize, animate_results, clamp_scroll_offset, is_manual_expansion_in_progress,
+        max_scroll_offset, move_selection, results_target, scroll_offset_for_selection,
+        scroll_start_for_offset,
     };
     use crate::ui::layout::LauncherLayout;
 

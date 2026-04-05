@@ -1,6 +1,7 @@
 use super::super::Launcher;
-use crate::core::desktop::{normalize_query, DesktopApp};
-use crate::core::search::{rank_applications, ApplicationSearchResponse};
+use super::super::channel::SearchResultsReceiverHandle;
+use crate::core::desktop::{DesktopApp, normalize_query};
+use crate::core::search::{ApplicationSearchResponse, rank_applications};
 use log::error;
 
 impl Launcher {
@@ -75,9 +76,7 @@ impl Launcher {
         self.submit_search_request();
     }
 
-    pub(in crate::ui::launcher) fn search_results_handle(
-        &self,
-    ) -> super::super::SearchResultsReceiverHandle {
+    pub(in crate::ui::launcher) fn search_results_handle(&self) -> SearchResultsReceiverHandle {
         self.search_results_handle.clone()
     }
 
