@@ -1,8 +1,9 @@
 use super::super::{Launcher, Message};
 use crate::ui::constants::UNFOCUS_GUARD_MS;
 use crate::ui::surface::launcher_visible_surface_settings;
-use iced::{Task, window};
+use iced::{window, Task};
 use log::error;
+use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,50 @@ impl Launcher {
                 Task::none()
             }
         }
+    }
+
+    pub(in crate::ui::launcher) fn open_location(&mut self, index: usize) -> Task<Message> {
+        let Some(app) = self.apps.get(index) else {
+            return Task::none();
+        };
+
+        let path = Path::new(&app.command);
+        let Some(parent) = path.parent() else {
+            error!("failed to determine parent directory for {}", app.command);
+            return Task::none();
+        };
+
+        match Command::new("xdg-open").arg(parent).spawn() {
+            Ok(_) => self.hide_launcher(),
+            Err(open_error) => {
+                let fallback = Command::new("gio")
+                    .arg("open")
+                    .arg(parent)
+                    .spawn()
+                    .map_err(|gio_error| format!("xdg-open: {open_error}; gio open: {gio_error}"));
+
+                match fallback {
+                    Ok(_) => self.hide_launcher(),
+                    Err(error) => {
+                        error!(
+                            "failed to open application location for {}: {error}",
+                            app.name
+                        );
+                        Task::none()
+                    }
+                }
+            }
+        }
+    }
+
+    pub(in crate::ui::launcher) fn handle_action_button_pressed(&mut self) -> Task<Message> {
+        if !self.is_expanded() || self.selected_application_index().is_none() {
+            self.action_overlay_pinned = false;
+            return Task::none();
+        }
+
+        self.action_overlay_pinned = !self.action_overlay_pinned;
+        Task::none()
     }
 
     pub(in crate::ui::launcher) fn show_launcher(&mut self) -> Task<Message> {

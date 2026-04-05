@@ -75,6 +75,9 @@ pub(super) struct Launcher {
     visual_cache: LauncherVisualCache,
     tray_controller: TrayController,
     modifiers: Modifiers,
+    suppress_alt_actions_until_release: bool,
+    action_overlay_pinned: bool,
+    suppress_next_query_change: bool,
     icon_resolve_in_flight: bool,
     app_refresh_in_flight: bool,
     app_refresh_started_at: Option<Instant>,
@@ -102,6 +105,7 @@ pub(super) enum Message {
     QueryChanged(String),
     LaunchFirstMatch,
     ExpandResults,
+    ActionButtonPressed,
     LaunchIndex(usize),
     AppCommand(AppCommand),
     IpcCommand(IpcCommand),
@@ -186,6 +190,9 @@ impl Launcher {
             visual_cache,
             tray_controller,
             modifiers: Modifiers::default(),
+            suppress_alt_actions_until_release: false,
+            action_overlay_pinned: false,
+            suppress_next_query_change: false,
             icon_resolve_in_flight: false,
             app_refresh_in_flight: false,
             app_refresh_started_at: None,
@@ -222,6 +229,9 @@ impl Launcher {
         self.progress_indicator = ProgressIndicator::default();
         self.icon_resolve_in_flight = false;
         self.app_refresh_started_at = None;
+        self.suppress_alt_actions_until_release = false;
+        self.action_overlay_pinned = false;
+        self.suppress_next_query_change = false;
     }
 
     pub(super) fn results_progress(&self) -> f32 {
@@ -281,6 +291,48 @@ impl Launcher {
                     .min(self.filtered_indices.len().saturating_sub(1)),
             )
             .copied()
+    }
+
+    pub(super) fn selected_application_index(&self) -> Option<usize> {
+        let index = self.selected_result_index()?;
+        let app = self.apps.get(index)?;
+        (crate::core::preferences::normalize_identifier(&app.entry_type) == "application")
+            .then_some(index)
+    }
+
+    pub(super) fn is_expanded(&self) -> bool {
+        self.results_progress > 0.0 || self.results_target > 0.0
+    }
+
+    pub(super) fn should_show_action_overlay(&self) -> bool {
+        self.is_expanded()
+            && self.selected_application_index().is_some()
+            && ((self.modifiers.alt() && !self.suppress_alt_actions_until_release)
+                || self.action_overlay_pinned)
+    }
+
+    pub(super) fn suppress_alt_actions_until_release(&mut self) {
+        self.suppress_alt_actions_until_release = true;
+    }
+
+    pub(super) fn sync_alt_action_state_with_modifiers(&mut self) {
+        if !self.modifiers.alt() {
+            self.suppress_alt_actions_until_release = false;
+            self.suppress_next_query_change = false;
+        }
+    }
+
+    pub(super) fn suppress_next_query_change(&mut self) {
+        self.suppress_next_query_change = true;
+    }
+
+    pub(super) fn consume_suppressed_query_change(&mut self) -> bool {
+        if !self.suppress_next_query_change {
+            return false;
+        }
+
+        self.suppress_next_query_change = false;
+        true
     }
 
     pub(super) fn move_selection(&mut self, offset: isize) {

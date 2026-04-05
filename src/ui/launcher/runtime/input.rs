@@ -1,7 +1,7 @@
 use super::super::{Launcher, Message};
 use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{Task, window};
+use iced::{window, Task};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {
@@ -43,6 +43,7 @@ impl Launcher {
         match event {
             keyboard::Event::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers;
+                self.sync_alt_action_state_with_modifiers();
                 Task::none()
             }
             keyboard::Event::KeyPressed {
@@ -61,6 +62,7 @@ impl Launcher {
             }
             keyboard::Event::KeyReleased { modifiers, .. } => {
                 self.modifiers = modifiers;
+                self.sync_alt_action_state_with_modifiers();
                 Task::none()
             }
         }
@@ -92,6 +94,10 @@ impl Launcher {
         modifiers: Modifiers,
         physical_key: keyboard::key::Physical,
     ) -> Task<Message> {
+        if let Some(task) = self.handle_alt_action_key_press(&key, modifiers, physical_key) {
+            return task;
+        }
+
         if self.matches_shortcut(
             &self.app_preferences.shortcuts.close_launcher,
             &key,
@@ -148,6 +154,39 @@ impl Launcher {
         }
 
         Task::none()
+    }
+
+    fn handle_alt_action_key_press(
+        &mut self,
+        key: &Key,
+        modifiers: Modifiers,
+        physical_key: keyboard::key::Physical,
+    ) -> Option<Task<Message>> {
+        if !modifiers.alt() || !self.should_show_action_overlay() {
+            return None;
+        }
+
+        if matches_alt_action_key(key, physical_key, '1') {
+            self.suppress_alt_actions_until_release();
+            self.suppress_next_query_change();
+
+            return Some(
+                self.selected_application_index()
+                    .map_or_else(Task::none, |index| self.launch(index)),
+            );
+        }
+
+        if matches_alt_action_key(key, physical_key, '2') {
+            self.suppress_alt_actions_until_release();
+            self.suppress_next_query_change();
+
+            return Some(
+                self.selected_application_index()
+                    .map_or_else(Task::none, |index| self.open_location(index)),
+            );
+        }
+
+        None
     }
 
     pub(in crate::ui::launcher) fn scroll_to_selected(
@@ -307,6 +346,16 @@ fn push_candidate(candidates: &mut Vec<String>, value: String) {
 
 fn normalize_binding_key(value: &str) -> String {
     crate::core::preferences::normalize_key_token(value)
+}
+
+fn matches_alt_action_key(key: &Key, physical_key: keyboard::key::Physical, digit: char) -> bool {
+    let needle = digit.to_string();
+    let digit_code = format!("digit{digit}");
+    let numpad_code = format!("numpad{digit}");
+
+    pressed_key_candidates(key, physical_key)
+        .into_iter()
+        .any(|pressed| pressed == needle || pressed == digit_code || pressed == numpad_code)
 }
 
 #[cfg(test)]

@@ -59,6 +59,41 @@ pub(super) fn bottom_strip_style(appearance: &ResolvedAppearance) -> container::
     }
 }
 
+pub(super) fn action_card_style(
+    layout: &LauncherLayout,
+    appearance: &ResolvedAppearance,
+) -> container::Style {
+    container::Style {
+        text_color: Some(appearance.primary_text),
+        background: Some(Background::Color(Color {
+            a: if appearance.panel_background.r > 0.5 {
+                0.97
+            } else {
+                0.92
+            },
+            ..appearance.panel_background
+        })),
+        border: Border {
+            color: appearance.accent_soft,
+            width: 1.0,
+            radius: layout.item_radius.into(),
+        },
+        shadow: Shadow {
+            color: Color {
+                a: if appearance.panel_background.r > 0.5 {
+                    0.12
+                } else {
+                    0.3
+                },
+                ..Color::BLACK
+            },
+            offset: iced::Vector::new(0.0, 8.0),
+            blur_radius: 22.0,
+        },
+        ..container::Style::default()
+    }
+}
+
 pub(super) fn search_input_style(
     appearance: &ResolvedAppearance,
     status: text_input::Status,

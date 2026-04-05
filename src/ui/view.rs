@@ -1,31 +1,40 @@
 use super::launcher::{Launcher, Message};
 use super::styles::{
-    backdrop_style, bottom_strip_style, calculator_badge_style, calculator_card_style,
-    calculator_divider_style, panel_style, progress_line_segment_style, result_button_style,
-    results_scroll_style, search_input_style,
+    action_card_style, backdrop_style, bottom_strip_style, calculator_badge_style,
+    calculator_card_style, calculator_divider_style, panel_style, progress_line_segment_style,
+    result_button_style, results_scroll_style, search_input_style,
 };
 use crate::core::desktop::{DesktopApp, trim_label};
-use iced::widget::{button, column, container, image, row, scrollable, svg, text, text_input};
+use iced::widget::{
+    button, column, container, image, opaque, row, scrollable, stack, svg, text, text_input,
+};
 use iced::{ContentFit, Element, Length, window};
 use iced_shadcn::{
     ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
     Theme as ShadcnTheme, icon_button,
 };
-use lucide_icons::iced::{icon_chevron_down, icon_corner_down_left, icon_search};
+use lucide_icons::iced::{
+    icon_chevron_down, icon_corner_down_left, icon_ellipsis_vertical, icon_external_link,
+    icon_folder_open, icon_search,
+};
 
 const BOTTOM_STRIP_ICON_BUTTON_SIZE: f32 = 20.0;
 const BOTTOM_STRIP_ICON_SIZE: f32 = 12.0;
 const RESULT_META_LABEL_WIDTH: f32 = 96.0;
 const RESULT_META_TEXT_MIN_SIZE: f32 = 10.0;
+const ACTION_CARD_MIN_WIDTH: f32 = 260.0;
 const CALC_MIN_HEADLINE_CHARS: usize = 18;
 const CALC_MAX_HEADLINE_CHARS: usize = 56;
 const CALC_MIN_BADGE_CHARS: usize = 20;
 const CALC_MAX_BADGE_CHARS: usize = 72;
+const ACTION_OVERLAY_RIGHT_OFFSET: f32 = 19.0;
+const ACTION_OVERLAY_BOTTOM_OFFSET: f32 = 12.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BottomStripAction {
     Expand,
     Launch,
+    ToggleActions,
 }
 
 impl Launcher {
@@ -63,7 +72,16 @@ impl Launcher {
             .max_width(self.layout.panel_width as u32)
             .height(Length::Shrink);
 
-        container(launcher_panel)
+        let root_panel: Element<'_, Message> = if self.is_expanded() {
+            stack![launcher_panel, self.view_action_layer()]
+                .width(Length::Fill)
+                .height(Length::Shrink)
+                .into()
+        } else {
+            launcher_panel.into()
+        };
+
+        container(root_panel)
             .width(Length::Fill)
             .height(Length::Fill)
             .padding([
@@ -375,12 +393,31 @@ impl Launcher {
         .padding([0, 4])
         .center_y(Length::Fill);
 
+        let action_trigger: Element<'_, Message> = if self.is_expanded() {
+            row![
+                text("Actions")
+                    .size((self.layout.result_secondary_text_size - 0.5).max(10.0))
+                    .color(appearance.muted_text),
+                action_icon_button(
+                    icon_ellipsis_vertical().size(BOTTOM_STRIP_ICON_SIZE),
+                    &shadcn_theme,
+                    BottomStripAction::ToggleActions,
+                ),
+            ]
+            .align_y(iced::alignment::Vertical::Center)
+            .spacing(self.layout.bottom_strip_label_gap)
+            .into()
+        } else {
+            container("").width(Length::Shrink).into()
+        };
+
         let show_more = container(
             row![
                 text(label_text)
                     .size(self.layout.result_primary_text_size)
                     .color(appearance.muted_text),
                 icon_button,
+                action_trigger,
             ]
             .align_y(iced::alignment::Vertical::Center)
             .spacing(self.layout.bottom_strip_label_gap),
@@ -398,6 +435,92 @@ impl Launcher {
         .height(Length::Fixed(self.layout.bottom_strip_height))
         .padding([0, self.layout.bottom_strip_padding_x as u16])
         .style(move |_| bottom_strip_style(&appearance))
+        .into()
+    }
+
+    fn view_action_layer(&self) -> Element<'_, Message> {
+        let should_show_overlay = self.should_show_action_overlay();
+        let right_offset = ACTION_OVERLAY_RIGHT_OFFSET.max(0.0);
+        let bottom_offset =
+            (self.layout.bottom_strip_height + ACTION_OVERLAY_BOTTOM_OFFSET).max(0.0);
+
+        container(
+            column![
+                container("").height(Length::Fill),
+                row![
+                    container("").width(Length::Fill),
+                    if should_show_overlay {
+                        opaque(self.view_action_overlay_box())
+                    } else {
+                        container("").width(Length::Shrink).into()
+                    },
+                    container("").width(Length::Fixed(right_offset)),
+                ]
+                .width(Length::Fill)
+                .align_y(iced::alignment::Vertical::Bottom),
+                container("").height(Length::Fixed(bottom_offset)),
+            ]
+            .width(Length::Fill)
+            .height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding([0, self.layout.bottom_strip_padding_x as u16])
+        .into()
+    }
+
+    fn view_action_overlay_box(&self) -> Element<'_, Message> {
+        let appearance = self.resolved_appearance();
+        let card_width = (self.layout.panel_width * 0.36).max(ACTION_CARD_MIN_WIDTH);
+        let action_text_size = (self.layout.result_secondary_text_size - 0.5).max(10.0);
+        let label_size = (self.layout.result_secondary_text_size - 1.0).max(10.0);
+
+        let open_action = row![
+            icon_external_link().size(self.layout.action_icon_size * 0.62),
+            text("Open")
+                .size(self.layout.result_primary_text_size)
+                .color(appearance.primary_text),
+            container("").width(Length::Fill),
+            text("Alt + 1")
+                .size(action_text_size)
+                .color(appearance.muted_text),
+        ]
+        .align_y(iced::alignment::Vertical::Center)
+        .spacing(8);
+
+        let open_location_action = row![
+            icon_folder_open().size(self.layout.action_icon_size * 0.62),
+            text("Open location")
+                .size(self.layout.result_primary_text_size)
+                .color(appearance.primary_text),
+            container("").width(Length::Fill),
+            text("Alt + 2")
+                .size(action_text_size)
+                .color(appearance.muted_text),
+        ]
+        .align_y(iced::alignment::Vertical::Center)
+        .spacing(8);
+
+        container(
+            column![
+                row![
+                    text("Application Actions")
+                        .size(label_size)
+                        .color(appearance.muted_text),
+                    container("").width(Length::Fill),
+                    text("hold Alt")
+                        .size(label_size)
+                        .color(appearance.muted_text),
+                ]
+                .align_y(iced::alignment::Vertical::Center),
+                open_action,
+                open_location_action,
+            ]
+            .spacing(8),
+        )
+        .width(Length::Fixed(card_width))
+        .padding([10, 12])
+        .style(move |_| action_card_style(&self.layout, &appearance))
         .into()
     }
 
@@ -531,6 +654,7 @@ fn action_icon_button<'a>(
         Some(match action {
             BottomStripAction::Expand => Message::ExpandResults,
             BottomStripAction::Launch => Message::LaunchFirstMatch,
+            BottomStripAction::ToggleActions => Message::ActionButtonPressed,
         }),
         ButtonProps::new()
             .variant(ButtonVariant::Outline)

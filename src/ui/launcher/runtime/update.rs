@@ -1,7 +1,7 @@
 use super::super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
-use iced::{Task, clipboard};
+use iced::{clipboard, Task};
 use log::{error, info};
 
 impl Launcher {
@@ -26,6 +26,17 @@ impl Launcher {
                 self.request_icon_resolution_for_visible()
             }
             Message::QueryChanged(query) => {
+                if self.modifiers.alt()
+                    && self.is_expanded()
+                    && self.selected_application_index().is_some()
+                {
+                    return Task::none();
+                }
+
+                if self.consume_suppressed_query_change() {
+                    return Task::none();
+                }
+
                 self.update_query(query);
                 self.scroll_to_selected(self.selected_rank, true)
             }
@@ -39,6 +50,7 @@ impl Launcher {
                 }
             }
             Message::ExpandResults => self.expand_results(),
+            Message::ActionButtonPressed => self.handle_action_button_pressed(),
             Message::LaunchIndex(index) => self.launch(index),
             Message::AppCommand(command) => self.handle_app_command(command),
             Message::IpcCommand(command) => self.handle_ipc_command(command),
@@ -150,5 +162,16 @@ mod tests {
         }));
 
         assert_eq!(launcher.results_scroll_offset, 232.0);
+    }
+
+    #[test]
+    fn suppressed_query_change_does_not_update_search_text() {
+        let mut launcher = launcher();
+        launcher.update_query("fire".to_string());
+        launcher.suppress_next_query_change();
+
+        let _ = launcher.update(Message::QueryChanged("fire1".to_string()));
+
+        assert_eq!(launcher.query, "fire");
     }
 }
