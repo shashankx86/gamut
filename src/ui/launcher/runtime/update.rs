@@ -1,7 +1,7 @@
 use super::super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
-use iced::{clipboard, Task};
+use iced::{Task, clipboard};
 use log::{error, info};
 
 impl Launcher {

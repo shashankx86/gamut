@@ -36,8 +36,6 @@ use channel::{
 };
 use display::calculator;
 
-pub(in crate::ui) use display::state::{render_range_for_viewport, spacer_height_for_rows};
-
 const ICON_RESOLVE_BATCH_SIZE: usize = 24;
 const APP_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 const APP_REFRESH_PROGRESS_DELAY: Duration = Duration::from_millis(180);

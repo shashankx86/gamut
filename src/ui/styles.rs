@@ -45,13 +45,6 @@ pub(super) fn panel_style(
     }
 }
 
-pub(super) fn progress_line_segment_style(color: Color) -> container::Style {
-    container::Style {
-        background: Some(Background::Color(color)),
-        ..container::Style::default()
-    }
-}
-
 pub(super) fn bottom_strip_style(appearance: &ResolvedAppearance) -> container::Style {
     container::Style {
         text_color: Some(appearance.muted_text),
@@ -182,13 +175,6 @@ pub(super) fn calculator_card_style(
             width: 1.0,
             radius: layout.item_radius.into(),
         },
-        ..container::Style::default()
-    }
-}
-
-pub(super) fn calculator_divider_style(appearance: &ResolvedAppearance) -> container::Style {
-    container::Style {
-        background: Some(Background::Color(appearance.panel_border)),
         ..container::Style::default()
     }
 }

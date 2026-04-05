@@ -1,12 +1,13 @@
 use super::launcher::{Launcher, Message};
 use super::styles::{
     action_card_style, backdrop_style, bottom_strip_style, calculator_badge_style,
-    calculator_card_style, calculator_divider_style, panel_style, progress_line_segment_style,
-    result_button_style, results_scroll_style, search_input_style,
+    calculator_card_style, panel_style, result_button_style, results_scroll_style,
+    search_input_style,
 };
 use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::{
-    button, column, container, image, opaque, row, scrollable, stack, svg, text, text_input,
+    Space, button, column, container, float, grid, image, keyed_column, opaque, row, rule,
+    scrollable, space, stack, svg, text, text_input, tooltip,
 };
 use iced::{ContentFit, Element, Length, window};
 use iced_shadcn::{
@@ -43,7 +44,7 @@ impl Launcher {
         let appearance = self.resolved_appearance();
 
         if !self.is_visible {
-            return container("")
+            return container(space::horizontal())
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .style(|_| backdrop_style())
@@ -116,29 +117,29 @@ impl Launcher {
 
     fn view_results_section(&self, progress: f32) -> Element<'_, Message> {
         let appearance = self.resolved_appearance();
-        let mut results = column![]
-            .spacing(self.layout.result_row_gap)
-            .width(Length::Fill);
+        let mut static_rows = Vec::new();
+        let mut keyed_rows = Vec::new();
         let calculation_preview = self.calculation_preview();
         let filtered = self.filtered_indices();
 
         if let Some(preview) = calculation_preview {
-            results = results.push(
+            static_rows.push(
                 container(
                     text("Calculator")
                         .size(self.layout.result_secondary_text_size)
                         .color(appearance.muted_text),
                 )
                 .width(Length::Fill)
-                .padding([0, 4]),
+                .padding([0, 4])
+                .into(),
             );
-            results = results.push(self.view_calculation_row(
+            static_rows.push(self.view_calculation_row(
                 preview.expression,
                 preview.formatted_value,
                 preview.words,
             ));
         } else if filtered.is_empty() && !self.search_in_flight {
-            results = results.push(
+            static_rows.push(
                 container(
                     text("No applications found")
                         .size(self.layout.empty_state_text_size)
@@ -147,41 +148,28 @@ impl Launcher {
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill),
+                .center_y(Length::Fill)
+                .into(),
             );
         } else if !filtered.is_empty() {
-            let render_range = self.result_render_range();
-            let visible_start = render_range.start;
-            let visible_end = render_range.end;
-
-            if visible_start > 0 {
-                results = results.push(
-                    container("")
-                        .width(Length::Fill)
-                        .height(Length::Fixed(self.results_top_spacer_height())),
-                );
+            for (rank, index) in filtered.iter().copied().enumerate() {
+                keyed_rows.push((
+                    index,
+                    self.view_result_row(index, rank == self.highlighted_rank),
+                ));
             }
+        }
 
-            for (rank, index) in filtered
-                .iter()
-                .copied()
-                .enumerate()
-                .skip(visible_start)
-                .take(visible_end.saturating_sub(visible_start))
-            {
-                results = results.push(self.view_result_row(index, rank == self.highlighted_rank));
-            }
+        let mut results = column(static_rows)
+            .spacing(self.layout.result_row_gap)
+            .width(Length::Fill);
 
-            let trailing_rows = filtered.len().saturating_sub(visible_end);
-            if trailing_rows > 0 {
-                results = results.push(container("").width(Length::Fill).height(Length::Fixed(
-                    super::launcher::spacer_height_for_rows(
-                        trailing_rows,
-                        self.layout.result_row_height,
-                        self.layout.result_row_gap,
-                    ),
-                )));
-            }
+        if !keyed_rows.is_empty() {
+            results = results.push(
+                keyed_column(keyed_rows)
+                    .spacing(self.layout.result_row_gap)
+                    .width(Length::Fill),
+            );
         }
 
         let list = scrollable(results)
@@ -314,25 +302,21 @@ impl Launcher {
         .width(Length::Fill)
         .align_x(iced::alignment::Horizontal::Center);
 
-        let card = row![
+        let card = grid([
             container(left)
-                .width(Length::FillPortion(1))
-                .height(Length::Fill)
+                .width(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill),
-            container("")
-                .width(1)
-                .height(Length::Fill)
-                .style(move |_| calculator_divider_style(&appearance)),
+                .center_y(Length::Fill)
+                .into(),
             container(right)
-                .width(Length::FillPortion(1))
-                .height(Length::Fill)
+                .width(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill),
-        ]
+                .center_y(Length::Fill)
+                .into(),
+        ])
+        .columns(2)
         .spacing(12)
-        .align_y(iced::alignment::Vertical::Center)
-        .height(Length::Fill);
+        .height(iced::widget::grid::Sizing::EvenlyDistribute(Length::Shrink));
 
         container(
             container(card)
@@ -394,21 +378,32 @@ impl Launcher {
         .center_y(Length::Fill);
 
         let action_trigger: Element<'_, Message> = if self.is_expanded() {
-            row![
-                text("Actions")
-                    .size((self.layout.result_secondary_text_size - 0.5).max(10.0))
-                    .color(appearance.muted_text),
+            let action_toggle = tooltip(
                 action_icon_button(
                     icon_ellipsis_vertical().size(BOTTOM_STRIP_ICON_SIZE),
                     &shadcn_theme,
                     BottomStripAction::ToggleActions,
                 ),
+                container(
+                    text("Toggle action shortcuts")
+                        .size(11)
+                        .color(appearance.primary_text),
+                )
+                .padding([4, 8]),
+                iced::widget::tooltip::Position::Top,
+            );
+
+            row![
+                text("Actions")
+                    .size((self.layout.result_secondary_text_size - 0.5).max(10.0))
+                    .color(appearance.muted_text),
+                action_toggle,
             ]
             .align_y(iced::alignment::Vertical::Center)
             .spacing(self.layout.bottom_strip_label_gap)
             .into()
         } else {
-            container("").width(Length::Shrink).into()
+            Space::new().width(Length::Shrink).into()
         };
 
         let show_more = container(
@@ -426,7 +421,7 @@ impl Launcher {
         .center_y(Length::Fill);
 
         container(
-            row![logo, container("").width(Length::Fill), show_more,]
+            row![logo, space::horizontal(), show_more,]
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .align_y(iced::alignment::Vertical::Center)
@@ -444,29 +439,31 @@ impl Launcher {
         let bottom_offset =
             (self.layout.bottom_strip_height + ACTION_OVERLAY_BOTTOM_OFFSET).max(0.0);
 
-        container(
-            column![
-                container("").height(Length::Fill),
-                row![
-                    container("").width(Length::Fill),
-                    if should_show_overlay {
-                        opaque(self.view_action_overlay_box())
-                    } else {
-                        container("").width(Length::Shrink).into()
-                    },
-                    container("").width(Length::Fixed(right_offset)),
-                ]
+        if !should_show_overlay {
+            return container(column![])
                 .width(Length::Fill)
-                .align_y(iced::alignment::Vertical::Bottom),
-                container("").height(Length::Fixed(bottom_offset)),
-            ]
+                .height(Length::Fill)
+                .padding([0, self.layout.bottom_strip_padding_x as u16])
+                .into();
+        }
+
+        let overlay = float(opaque(self.view_action_overlay_box())).translate(
+            move |content_bounds, viewport_bounds| {
+                let target_x =
+                    viewport_bounds.x + viewport_bounds.width - content_bounds.width - right_offset;
+                let target_y = viewport_bounds.y + viewport_bounds.height
+                    - content_bounds.height
+                    - bottom_offset;
+
+                iced::Vector::new(target_x - content_bounds.x, target_y - content_bounds.y)
+            },
+        );
+
+        container(overlay)
             .width(Length::Fill)
-            .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding([0, self.layout.bottom_strip_padding_x as u16])
-        .into()
+            .height(Length::Fill)
+            .padding([0, self.layout.bottom_strip_padding_x as u16])
+            .into()
     }
 
     fn view_action_overlay_box(&self) -> Element<'_, Message> {
@@ -480,7 +477,7 @@ impl Launcher {
             text("Open")
                 .size(self.layout.result_primary_text_size)
                 .color(appearance.primary_text),
-            container("").width(Length::Fill),
+            space::horizontal(),
             text("Alt + 1")
                 .size(action_text_size)
                 .color(appearance.muted_text),
@@ -493,7 +490,7 @@ impl Launcher {
             text("Open location")
                 .size(self.layout.result_primary_text_size)
                 .color(appearance.primary_text),
-            container("").width(Length::Fill),
+            space::horizontal(),
             text("Alt + 2")
                 .size(action_text_size)
                 .color(appearance.muted_text),
@@ -507,7 +504,7 @@ impl Launcher {
                     text("Application Actions")
                         .size(label_size)
                         .color(appearance.muted_text),
-                    container("").width(Length::Fill),
+                    space::horizontal(),
                     text("hold Alt")
                         .size(label_size)
                         .color(appearance.muted_text),
@@ -564,46 +561,40 @@ impl Launcher {
             self.progress_line_widths(self.layout.panel_width);
 
         row![
-            container("")
-                .width(Length::Fixed(leading_track))
-                .height(1)
-                .style(move |_| progress_line_segment_style(appearance.progress_track)),
-            container("")
-                .width(Length::Fixed(active))
-                .height(1)
-                .style(move |_| progress_line_segment_style(appearance.progress_indicator)),
-            container("")
-                .width(Length::Fixed(trailing_track))
-                .height(1)
-                .style(move |_| progress_line_segment_style(appearance.progress_track)),
+            container(
+                rule::horizontal(1).style(move |_| iced::widget::rule::Style {
+                    color: appearance.progress_track,
+                    radius: 0.0.into(),
+                    fill_mode: iced::widget::rule::FillMode::Full,
+                    snap: true,
+                }),
+            )
+            .width(Length::Fixed(leading_track))
+            .height(1),
+            container(
+                rule::horizontal(1).style(move |_| iced::widget::rule::Style {
+                    color: appearance.progress_indicator,
+                    radius: 0.0.into(),
+                    fill_mode: iced::widget::rule::FillMode::Full,
+                    snap: true,
+                }),
+            )
+            .width(Length::Fixed(active))
+            .height(1),
+            container(
+                rule::horizontal(1).style(move |_| iced::widget::rule::Style {
+                    color: appearance.progress_track,
+                    radius: 0.0.into(),
+                    fill_mode: iced::widget::rule::FillMode::Full,
+                    snap: true,
+                }),
+            )
+            .width(Length::Fixed(trailing_track))
+            .height(1),
         ]
         .width(Length::Fill)
         .height(1)
         .into()
-    }
-
-    fn result_render_range(&self) -> std::ops::Range<usize> {
-        let filtered = self.filtered_indices();
-
-        if filtered.is_empty() {
-            return 0..0;
-        }
-
-        super::launcher::render_range_for_viewport(
-            self.results_scroll_offset,
-            self.layout.results_viewport_height(),
-            filtered.len(),
-            self.layout.result_row_height,
-            self.layout.result_row_gap,
-        )
-    }
-
-    fn results_top_spacer_height(&self) -> f32 {
-        super::launcher::spacer_height_for_rows(
-            self.result_render_range().start,
-            self.layout.result_row_height,
-            self.layout.result_row_gap,
-        )
     }
 }
 
@@ -769,32 +760,6 @@ mod tests {
         launcher.filtered_indices = launcher.all_app_indices.clone();
         launcher.results_scroll_offset = 0.0;
         launcher
-    }
-
-    #[test]
-    fn query_driven_expansion_only_renders_visible_rows_plus_buffer() {
-        let launcher = launcher_with_results(20);
-
-        assert_eq!(launcher.result_render_range(), 0..6);
-    }
-
-    #[test]
-    fn render_range_tracks_scrolled_window_for_large_result_sets() {
-        let mut launcher = launcher_with_results(20);
-        launcher.results_scroll_offset = 4.0 * launcher.layout.result_row_scroll_step();
-
-        assert_eq!(launcher.result_render_range(), 3..10);
-    }
-
-    #[test]
-    fn top_spacer_matches_hidden_rows_without_extra_gap() {
-        let mut launcher = launcher_with_results(20);
-        launcher.results_scroll_offset = 2.1 * launcher.layout.result_row_scroll_step();
-
-        assert_eq!(
-            launcher.results_top_spacer_height(),
-            launcher.layout.result_row_height
-        );
     }
 
     #[test]

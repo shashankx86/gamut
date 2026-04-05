@@ -1,8 +1,6 @@
 use crate::ui::layout::LauncherLayout;
-use std::ops::Range;
 
 const SNAP_THRESHOLD: f32 = 0.01;
-const EXPANSION_RENDER_BUFFER_ROWS: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::ui::launcher) enum SurfaceResize {
@@ -66,52 +64,6 @@ fn is_manual_expansion_in_progress(
     query_is_empty && manually_expanded && target > progress && progress < 1.0
 }
 
-pub(in crate::ui) fn render_range_for_viewport(
-    offset_y: f32,
-    viewport_height: f32,
-    total_rows: usize,
-    row_height: f32,
-    row_gap: f32,
-) -> Range<usize> {
-    if total_rows == 0 || row_height <= 0.0 {
-        return 0..0;
-    }
-
-    let step = row_height + row_gap.max(0.0);
-    if step <= 0.0 {
-        return 0..0;
-    }
-
-    let max_start = total_rows.saturating_sub(1);
-    let start = scroll_start_for_offset(offset_y, step, max_start)
-        .saturating_sub(EXPANSION_RENDER_BUFFER_ROWS);
-
-    if viewport_height <= 0.0 {
-        return start..(start + 1).min(total_rows);
-    }
-
-    let visible_end = (((offset_y.max(0.0) + viewport_height) / step).ceil() as usize)
-        .min(total_rows)
-        .max(start.saturating_add(1));
-    let end = visible_end
-        .saturating_add(EXPANSION_RENDER_BUFFER_ROWS)
-        .min(total_rows);
-
-    start..end
-}
-
-pub(in crate::ui) fn spacer_height_for_rows(
-    row_count: usize,
-    row_height: f32,
-    row_gap: f32,
-) -> f32 {
-    if row_count == 0 {
-        0.0
-    } else {
-        (row_count as f32 * row_height) + ((row_count.saturating_sub(1) as f32) * row_gap)
-    }
-}
-
 pub(in crate::ui::launcher) fn scroll_start_for_offset(
     offset_y: f32,
     row_step: f32,
@@ -135,8 +87,12 @@ pub(in crate::ui::launcher) fn clamp_scroll_offset(
         return 0.0;
     }
 
-    let max_offset =
-        (spacer_height_for_rows(total_rows, row_height, row_gap) - viewport_height).max(0.0);
+    let content_height = if total_rows == 0 {
+        0.0
+    } else {
+        (total_rows as f32 * row_height) + ((total_rows.saturating_sub(1) as f32) * row_gap)
+    };
+    let max_offset = (content_height - viewport_height).max(0.0);
 
     if !offset_y.is_finite() {
         0.0
@@ -205,8 +161,7 @@ pub(in crate::ui::launcher) fn move_selection(
 mod tests {
     use super::{
         SurfaceResize, animate_results, clamp_scroll_offset, is_manual_expansion_in_progress,
-        move_selection, render_range_for_viewport, results_target, scroll_offset_for_selection,
-        scroll_start_for_offset, spacer_height_for_rows,
+        move_selection, results_target, scroll_offset_for_selection, scroll_start_for_offset,
     };
     use crate::ui::layout::LauncherLayout;
 
@@ -241,26 +196,6 @@ mod tests {
         assert!(!is_manual_expansion_in_progress(false, true, 0.25, 1.0));
         assert!(!is_manual_expansion_in_progress(true, false, 0.25, 1.0));
         assert!(!is_manual_expansion_in_progress(true, true, 1.0, 1.0));
-    }
-
-    #[test]
-    fn render_range_limits_work_to_visible_rows_plus_buffer() {
-        assert_eq!(render_range_for_viewport(0.0, 288.0, 200, 54.0, 4.0), 0..6);
-        assert_eq!(
-            render_range_for_viewport(232.0, 288.0, 200, 54.0, 4.0),
-            3..10
-        );
-        assert_eq!(
-            render_range_for_viewport(464.0, 120.0, 10, 54.0, 4.0),
-            7..10
-        );
-    }
-
-    #[test]
-    fn spacer_height_scales_with_hidden_rows() {
-        assert_eq!(spacer_height_for_rows(0, 54.0, 4.0), 0.0);
-        assert_eq!(spacer_height_for_rows(1, 54.0, 4.0), 54.0);
-        assert_eq!(spacer_height_for_rows(3, 54.0, 4.0), 170.0);
     }
 
     #[test]

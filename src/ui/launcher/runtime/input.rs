@@ -1,7 +1,7 @@
 use super::super::{Launcher, Message};
 use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{operation, scrollable};
-use iced::{window, Task};
+use iced::{Task, window};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn on_window_opened(&mut self, id: window::Id) -> Task<Message> {

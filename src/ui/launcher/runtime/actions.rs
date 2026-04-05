@@ -1,7 +1,7 @@
 use super::super::{Launcher, Message};
 use crate::ui::constants::UNFOCUS_GUARD_MS;
 use crate::ui::surface::launcher_visible_surface_settings;
-use iced::{window, Task};
+use iced::{Task, window};
 use log::error;
 use std::path::Path;
 use std::process::Command;
