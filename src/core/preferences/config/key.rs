@@ -1,4 +1,4 @@
-use super::ShortcutAction;
+use crate::core::preferences::ShortcutAction;
 use std::fmt;
 use std::str::FromStr;
 
