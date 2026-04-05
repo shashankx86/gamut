@@ -1,7 +1,7 @@
 mod command;
 mod output;
 
-pub use command::{parse_command, CliCommand, CliMode, HelpTopic};
+pub use command::{CliCommand, CliMode, HelpTopic, parse_command};
 pub use output::{print_help, print_version};
 
 #[cfg(test)]
