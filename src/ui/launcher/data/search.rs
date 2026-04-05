@@ -13,6 +13,7 @@ impl Launcher {
         self.highlighted_rank = 0;
         self.results_scroll_offset = 0.0;
         self.scroll_start_rank = 0;
+        self.reset_results_scrollbar_visibility();
     }
 
     pub(in crate::ui::launcher) fn update_query(&mut self, query: String) {

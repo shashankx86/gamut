@@ -83,22 +83,29 @@ pub(in crate::ui::launcher) fn clamp_scroll_offset(
     row_height: f32,
     row_gap: f32,
 ) -> f32 {
-    if total_rows == 0 {
-        return 0.0;
-    }
-
-    let content_height = if total_rows == 0 {
-        0.0
-    } else {
-        (total_rows as f32 * row_height) + ((total_rows.saturating_sub(1) as f32) * row_gap)
-    };
-    let max_offset = (content_height - viewport_height).max(0.0);
+    let max_offset = max_scroll_offset(total_rows, viewport_height, row_height, row_gap);
 
     if !offset_y.is_finite() {
         0.0
     } else {
         offset_y.clamp(0.0, max_offset)
     }
+}
+
+pub(in crate::ui::launcher) fn max_scroll_offset(
+    total_rows: usize,
+    viewport_height: f32,
+    row_height: f32,
+    row_gap: f32,
+) -> f32 {
+    if total_rows == 0 {
+        return 0.0;
+    }
+
+    let content_height = (total_rows as f32 * row_height)
+        + ((total_rows.saturating_sub(1) as f32) * row_gap.max(0.0));
+
+    (content_height - viewport_height.max(0.0)).max(0.0)
 }
 
 pub(in crate::ui::launcher) fn scroll_offset_for_selection(
@@ -161,7 +168,8 @@ pub(in crate::ui::launcher) fn move_selection(
 mod tests {
     use super::{
         SurfaceResize, animate_results, clamp_scroll_offset, is_manual_expansion_in_progress,
-        move_selection, results_target, scroll_offset_for_selection, scroll_start_for_offset,
+        max_scroll_offset, move_selection, results_target, scroll_offset_for_selection,
+        scroll_start_for_offset,
     };
     use crate::ui::layout::LauncherLayout;
 
@@ -226,6 +234,12 @@ mod tests {
     fn scroll_offset_is_clamped_to_content_bounds() {
         assert_eq!(clamp_scroll_offset(500.0, 3, 288.0, 54.0, 4.0), 0.0);
         assert_eq!(clamp_scroll_offset(1_500.0, 20, 288.0, 54.0, 4.0), 868.0);
+    }
+
+    #[test]
+    fn max_scroll_offset_reports_zero_for_non_overflowing_content() {
+        assert_eq!(max_scroll_offset(3, 288.0, 54.0, 4.0), 0.0);
+        assert_eq!(max_scroll_offset(20, 288.0, 54.0, 4.0), 868.0);
     }
 
     #[test]

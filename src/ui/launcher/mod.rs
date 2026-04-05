@@ -2,6 +2,7 @@ mod channel;
 mod data;
 mod display;
 mod runtime;
+mod scroll;
 
 use super::constants::MAX_RESULTS;
 use super::layout::{LauncherLayout, LauncherPreferences};
@@ -62,6 +63,7 @@ pub(super) struct Launcher {
     pub(super) search_in_flight: bool,
     pub(super) results_scroll_offset: f32,
     pub(super) scroll_start_rank: usize,
+    results_scrollbar_visibility: scroll::ResultsScrollbarVisibility,
     pub(super) filtered_indices: Vec<usize>,
     pub(super) results_progress: f32,
     pub(super) results_target: f32,
@@ -97,6 +99,7 @@ struct LauncherVisualCache {
 #[derive(Debug, Clone)]
 pub(super) enum Message {
     Tick,
+    ScrollbarVisibilityTick,
     AppsLoaded(Vec<DesktopApp>),
     SearchResultsLoaded(ApplicationSearchResponse),
     IconsResolved(Vec<(usize, Option<PathBuf>)>),
@@ -177,6 +180,7 @@ impl Launcher {
             search_in_flight: false,
             results_scroll_offset: 0.0,
             scroll_start_rank: 0,
+            results_scrollbar_visibility: scroll::ResultsScrollbarVisibility::default(),
             filtered_indices: Vec::new(),
             results_progress: 0.0,
             results_target: 0.0,

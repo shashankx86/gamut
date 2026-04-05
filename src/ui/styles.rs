@@ -195,9 +195,33 @@ pub(super) fn calculator_badge_style(appearance: &ResolvedAppearance) -> contain
 pub(super) fn results_scroll_style(
     theme: &Theme,
     appearance: &ResolvedAppearance,
+    show_scrollbar: bool,
     status: scrollable::Status,
 ) -> scrollable::Style {
     let mut style = scrollable::default(theme, status);
+
+    if !show_scrollbar {
+        style.container = container::Style::default();
+        style.vertical_rail = scrollable::Rail {
+            background: None,
+            border: Border::default(),
+            scroller: scrollable::Scroller {
+                background: Background::Color(Color::TRANSPARENT),
+                border: Border::default(),
+            },
+        };
+        style.horizontal_rail = scrollable::Rail {
+            background: None,
+            border: Border::default(),
+            scroller: scrollable::Scroller {
+                background: Background::Color(Color::TRANSPARENT),
+                border: Border::default(),
+            },
+        };
+        style.gap = None;
+        return style;
+    }
+
     let (scroller_background, scroller_border) = match status {
         scrollable::Status::Dragged {
             is_vertical_scrollbar_dragged: true,
@@ -219,22 +243,40 @@ pub(super) fn results_scroll_style(
         ),
     };
 
+    let show_track = matches!(
+        status,
+        scrollable::Status::Dragged {
+            is_vertical_scrollbar_dragged: true,
+            ..
+        }
+    );
+
     let vertical_rail = scrollable::Rail {
-        background: Some(Background::Color(Color {
-            a: appearance.scrollbar_track.a * 0.72,
-            ..appearance.scrollbar_track
-        })),
+        background: if show_track {
+            Some(Background::Color(Color {
+                a: appearance.scrollbar_track.a * 0.52,
+                ..appearance.scrollbar_track
+            }))
+        } else {
+            None
+        },
         border: Border {
-            color: appearance.scrollbar_track_border,
+            color: Color {
+                a: appearance.scrollbar_track_border.a * 0.0,
+                ..appearance.scrollbar_track_border
+            },
             width: 0.0,
-            radius: 10.0.into(),
+            radius: 0.0.into(),
         },
         scroller: scrollable::Scroller {
             background: Background::Color(scroller_background),
             border: Border {
-                color: scroller_border,
-                width: 0.5,
-                radius: 10.0.into(),
+                color: Color {
+                    a: scroller_border.a * 0.55,
+                    ..scroller_border
+                },
+                width: 0.0,
+                radius: 0.0.into(),
             },
         },
     };

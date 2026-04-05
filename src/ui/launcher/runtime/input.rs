@@ -127,6 +127,7 @@ impl Launcher {
             let previous_rank = self.selected_rank;
             self.bump_selection_revision();
             self.move_selection(1);
+            self.reveal_results_scrollbar_for_keyboard_end(previous_rank);
             return self.scroll_to_selected(previous_rank, false);
         }
 
@@ -199,6 +200,7 @@ impl Launcher {
             self.scroll_start_rank = 0;
             self.highlighted_rank = 0;
             return if force {
+                self.mark_programmatic_results_scroll(0.0);
                 operation::scroll_to(
                     self.results_scroll_id.clone(),
                     scrollable::AbsoluteOffset {
@@ -233,6 +235,7 @@ impl Launcher {
         if did_scroll && self.selected_rank != previous_rank {
             self.highlighted_rank = previous_rank;
             let revision = self.selection_revision;
+            self.mark_programmatic_results_scroll(target_offset);
             operation::scroll_to(
                 self.results_scroll_id.clone(),
                 scrollable::AbsoluteOffset {
@@ -249,6 +252,7 @@ impl Launcher {
             if !force && !did_scroll {
                 Task::none()
             } else {
+                self.mark_programmatic_results_scroll(target_offset);
                 operation::scroll_to(
                     self.results_scroll_id.clone(),
                     scrollable::AbsoluteOffset {
@@ -283,6 +287,13 @@ impl Launcher {
             row_step,
             self.filtered_indices().len().saturating_sub(1),
         );
+
+        let is_programmatic = self.consume_programmatic_results_scroll_event(offset);
+        let did_move = (offset - self.results_scroll_offset).abs() > f32::EPSILON;
+
+        if !is_programmatic && did_move {
+            self.reveal_results_scrollbar_for_mouse_scroll();
+        }
 
         self.results_scroll_offset = offset;
         self.scroll_start_rank = start;

@@ -6,10 +6,10 @@ use super::styles::{
 };
 use crate::core::desktop::{DesktopApp, trim_label};
 use iced::widget::{
-    Space, button, column, container, float, grid, image, keyed_column, opaque, row, rule,
-    scrollable, space, stack, svg, text, text_input, tooltip,
+    Space, button, column, container, float, image, keyed_column, opaque, row, rule, scrollable,
+    space, stack, svg, text, text_input, tooltip,
 };
-use iced::{ContentFit, Element, Length, window};
+use iced::{ContentFit, Element, Length, Padding, window};
 use iced_shadcn::{
     ButtonProps, ButtonRadius, ButtonSize, ButtonVariant, Palette as ShadcnPalette,
     Theme as ShadcnTheme, icon_button,
@@ -172,25 +172,38 @@ impl Launcher {
             );
         }
 
-        let list = scrollable(results)
+        let show_scrollbar = self.should_show_results_scrollbar();
+        let scrollbar = if show_scrollbar {
+            iced::widget::scrollable::Scrollbar::new()
+                .width(8)
+                .scroller_width(4)
+                .margin(0)
+        } else {
+            iced::widget::scrollable::Scrollbar::hidden()
+        };
+
+        let padded_results = container(results)
+            .width(Length::Fill)
+            .padding([0, self.layout.results_side_padding as u16]);
+
+        let list = scrollable(padded_results)
             .id(self.results_scroll_id.clone())
             .height(Length::Fill)
             .on_scroll(Message::ResultsScrolled)
-            .direction(iced::widget::scrollable::Direction::Vertical(
-                iced::widget::scrollable::Scrollbar::new()
-                    .width(10)
-                    .scroller_width(6)
-                    .spacing(2),
-            ))
-            .style(move |theme, status| results_scroll_style(theme, &appearance, status));
+            .direction(iced::widget::scrollable::Direction::Vertical(scrollbar))
+            .style(move |theme, status| {
+                results_scroll_style(theme, &appearance, show_scrollbar, status)
+            });
 
         container(list)
             .width(Length::Fill)
             .height(Length::Fixed(self.layout.results_height * progress))
-            .padding([
-                self.layout.results_top_bottom_padding as u16,
-                self.layout.results_side_padding as u16,
-            ])
+            .padding(Padding {
+                top: self.layout.results_top_bottom_padding,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            })
             .into()
     }
 
@@ -302,21 +315,19 @@ impl Launcher {
         .width(Length::Fill)
         .align_x(iced::alignment::Horizontal::Center);
 
-        let card = grid([
+        let card = row![
             container(left)
                 .width(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill)
-                .into(),
+                .center_y(Length::Fill),
             container(right)
                 .width(Length::Fill)
                 .center_x(Length::Fill)
-                .center_y(Length::Fill)
-                .into(),
-        ])
-        .columns(2)
+                .center_y(Length::Fill),
+        ]
         .spacing(12)
-        .height(iced::widget::grid::Sizing::EvenlyDistribute(Length::Shrink));
+        .width(Length::Fill)
+        .align_y(iced::alignment::Vertical::Center);
 
         container(
             container(card)
@@ -735,32 +746,6 @@ fn number_text_for_value(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::app_command::AppCommand;
-    use crate::core::desktop::DesktopApp;
-    use std::sync::mpsc;
-
-    fn app(index: usize) -> DesktopApp {
-        DesktopApp::new(
-            format!("App {index}"),
-            "Application".to_string(),
-            format!("/usr/bin/app-{index} %u"),
-            format!("/usr/bin/app-{index}"),
-            vec!["%u".to_string()],
-            None,
-            Vec::new(),
-            None,
-        )
-    }
-
-    fn launcher_with_results(total_results: usize) -> Launcher {
-        let (_tx, rx) = mpsc::channel::<AppCommand>();
-        let (mut launcher, _) = Launcher::new(rx, crate::core::tray::TrayController::detached());
-        launcher.apps = (0..total_results).map(app).collect();
-        launcher.all_app_indices = (0..launcher.apps.len()).collect();
-        launcher.filtered_indices = launcher.all_app_indices.clone();
-        launcher.results_scroll_offset = 0.0;
-        launcher
-    }
 
     #[test]
     fn truncation_uses_middle_three_dot_ellipsis() {

@@ -5,6 +5,7 @@ use std::time::Duration;
 
 const ACTIVE_TICK_MS: u64 = 25;
 const IDLE_TICK_MS: u64 = 1000;
+const SCROLLBAR_VISIBILITY_TICK_MS: u64 = 100;
 
 impl Launcher {
     pub(in crate::ui) fn subscription(&self) -> Subscription<Message> {
@@ -31,6 +32,10 @@ impl Launcher {
         };
 
         subscriptions.push(time::every(Duration::from_millis(tick_ms)).map(|_| Message::Tick));
+        subscriptions.push(
+            time::every(Duration::from_millis(SCROLLBAR_VISIBILITY_TICK_MS))
+                .map(|_| Message::ScrollbarVisibilityTick),
+        );
 
         Subscription::batch(subscriptions)
     }

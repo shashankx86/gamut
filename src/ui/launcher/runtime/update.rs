@@ -8,6 +8,7 @@ impl Launcher {
     pub(in crate::ui) fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => self.on_tick(),
+            Message::ScrollbarVisibilityTick => self.on_scrollbar_visibility_tick(),
             Message::AppsLoaded(apps) => {
                 self.finish_app_refresh();
                 info!("loaded {} desktop applications", apps.len());
