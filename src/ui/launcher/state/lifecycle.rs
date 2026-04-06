@@ -2,7 +2,8 @@ use super::super::display;
 use super::super::Message;
 use super::Launcher;
 use super::ProgressIndicator;
-use iced::Task;
+use iced::widget::operation;
+use iced::{window, Task};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn clear_window_state(&mut self) {
@@ -46,15 +47,36 @@ impl Launcher {
 
         match step.surface_resize {
             display::state::SurfaceResize::None => Task::none(),
-            display::state::SurfaceResize::Expanded => Task::done(Message::SizeChange {
-                id,
-                size: self.layout.expanded_surface_size(),
-            }),
-            display::state::SurfaceResize::Collapsed => Task::done(Message::SizeChange {
-                id,
-                size: self.layout.collapsed_surface_size(),
-            }),
+            display::state::SurfaceResize::Expanded => {
+                self.request_surface_resize(id, self.layout.expanded_surface_size())
+            }
+            display::state::SurfaceResize::Collapsed => {
+                self.request_surface_resize(id, self.layout.collapsed_surface_size())
+            }
         }
+    }
+
+    pub(in crate::ui::launcher) fn focus_search_input(&self) -> Task<Message> {
+        operation::focus(self.input_id.clone())
+    }
+
+    pub(in crate::ui::launcher) fn with_search_focus_if_visible(
+        &self,
+        task: Task<Message>,
+    ) -> Task<Message> {
+        if self.is_visible && self.launcher_window_id.is_some() {
+            task.chain(self.focus_search_input())
+        } else {
+            task
+        }
+    }
+
+    pub(in crate::ui::launcher) fn request_surface_resize(
+        &self,
+        id: window::Id,
+        size: (u32, u32),
+    ) -> Task<Message> {
+        self.with_search_focus_if_visible(Task::done(Message::SizeChange { id, size }))
     }
 
     pub(in crate::ui::launcher) fn selected_result_index(&self) -> Option<usize> {

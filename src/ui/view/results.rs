@@ -1,13 +1,13 @@
 use super::{
-    CALC_MAX_BADGE_CHARS, CALC_MAX_HEADLINE_CHARS, CALC_MIN_BADGE_CHARS, CALC_MIN_HEADLINE_CHARS,
-};
-use super::{
+    button, calculator_badge_style, calculator_card_style, column, container, image, keyed_column,
+    normalize_result_display_value, results_scroll_style, truncate_middle_with_ellipsis,
     DesktopApp, Launcher, Length, Message, Padding, RESULT_META_LABEL_WIDTH,
-    RESULT_META_TEXT_MIN_SIZE, button, calculator_badge_style, calculator_card_style, column,
-    container, image, keyed_column, normalize_result_display_value, results_scroll_style,
-    truncate_middle_with_ellipsis,
+    RESULT_META_TEXT_MIN_SIZE,
 };
 use super::{number_text_for_value, row, scrollable, svg, text, trim_label};
+use super::{
+    CALC_MAX_BADGE_CHARS, CALC_MAX_HEADLINE_CHARS, CALC_MIN_BADGE_CHARS, CALC_MIN_HEADLINE_CHARS,
+};
 use iced::{ContentFit, Element};
 
 impl Launcher {
@@ -113,7 +113,7 @@ impl Launcher {
                 .height(Length::Fixed(self.layout.result_icon_box_size))
                 .align_x(iced::alignment::Horizontal::Center)
                 .align_y(iced::alignment::Vertical::Center)
-                .padding([0, 3]),
+                .padding([0, 2]),
             column![
                 text(&app.name)
                     .size(self.layout.result_primary_text_size)
@@ -122,10 +122,14 @@ impl Launcher {
                     .size(self.layout.result_secondary_text_size)
                     .color(appearance.secondary_text),
             ]
-            .spacing(1)
+            .spacing(0)
             .width(Length::Fill),
             container(
                 text(&app.entry_type)
+                    .font(iced::Font {
+                        weight: iced::font::Weight::Bold,
+                        ..iced::Font::DEFAULT
+                    })
                     .size(
                         (self.layout.result_secondary_text_size + 1.0)
                             .max(RESULT_META_TEXT_MIN_SIZE)
@@ -135,7 +139,7 @@ impl Launcher {
             .width(Length::Fixed(RESULT_META_LABEL_WIDTH))
             .align_x(iced::alignment::Horizontal::Right),
         ]
-        .spacing(10)
+        .spacing(8)
         .align_y(iced::alignment::Vertical::Center)
         .width(Length::Fill)
         .height(Length::Fill);
@@ -143,7 +147,7 @@ impl Launcher {
         container(
             button(left)
                 .on_press(Message::LaunchIndex(index))
-                .padding([0, 10])
+                .padding([0, 8])
                 .width(Length::Fill)
                 .height(Length::Fixed(self.layout.result_row_button_height()))
                 .style(move |_theme, status| {

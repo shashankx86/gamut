@@ -1,7 +1,7 @@
 use super::super::super::{Launcher, Message};
 use crate::core::app_command::AppCommand;
 use crate::core::ipc::IpcCommand;
-use iced::{Task, clipboard};
+use iced::{clipboard, Task};
 use log::{error, info};
 
 impl Launcher {
@@ -39,7 +39,8 @@ impl Launcher {
                 }
 
                 self.update_query(query);
-                self.scroll_to_selected(self.selected_rank, true)
+                let scroll_task = self.scroll_to_selected(self.selected_rank, true);
+                self.with_search_focus_if_visible(scroll_task)
             }
             Message::LaunchFirstMatch => {
                 if let Some(calculation_preview) = self.calculation_preview() {

@@ -3,7 +3,7 @@ use super::{
     space, text, Launcher, Message, ACTION_CARD_MIN_COMPACT_WIDTH, ACTION_CARD_MIN_WIDTH,
     ACTION_OVERLAY_BOTTOM_OFFSET, ACTION_OVERLAY_RIGHT_OFFSET,
 };
-use iced::{Element, Length};
+use iced::{Element, Font, Length};
 
 impl Launcher {
     pub(super) fn view_action_layer(&self) -> Element<'_, Message> {
@@ -62,8 +62,23 @@ impl Launcher {
         let action_text_size = (self.layout.result_secondary_text_size - 0.5).max(10.0);
         let label_size = (self.layout.result_secondary_text_size - 1.0).max(10.0);
 
+        let header_label = row![
+            text("Application")
+                .font(Font {
+                    weight: iced::font::Weight::Bold,
+                    ..Font::DEFAULT
+                })
+                .size(label_size)
+                .color(appearance.muted_text),
+            text("Actions")
+                .size(label_size)
+                .color(appearance.muted_text),
+        ]
+        .align_y(iced::alignment::Vertical::Center)
+        .spacing(4);
+
         let open_action = row![
-            icon_external_link().size(self.layout.action_icon_size * 0.62),
+            icon_external_link().size(self.layout.action_icon_size * 0.56),
             text("Open")
                 .size(self.layout.result_primary_text_size)
                 .color(appearance.primary_text),
@@ -73,10 +88,10 @@ impl Launcher {
                 .color(appearance.muted_text),
         ]
         .align_y(iced::alignment::Vertical::Center)
-        .spacing(8);
+        .spacing(6);
 
         let open_location_action = row![
-            icon_folder_open().size(self.layout.action_icon_size * 0.62),
+            icon_folder_open().size(self.layout.action_icon_size * 0.56),
             text("Open location")
                 .size(self.layout.result_primary_text_size)
                 .color(appearance.primary_text),
@@ -86,14 +101,12 @@ impl Launcher {
                 .color(appearance.muted_text),
         ]
         .align_y(iced::alignment::Vertical::Center)
-        .spacing(8);
+        .spacing(6);
 
         container(
             column![
                 row![
-                    text("Application Actions")
-                        .size(label_size)
-                        .color(appearance.muted_text),
+                    header_label,
                     space::horizontal(),
                     text("hold Alt")
                         .size(label_size)
@@ -103,10 +116,10 @@ impl Launcher {
                 open_action,
                 open_location_action,
             ]
-            .spacing(8),
+            .spacing(6),
         )
         .width(Length::Fixed(card_width))
-        .padding([10, 12])
+        .padding([8, 10])
         .style(move |_| action_card_style(&self.layout, &appearance))
         .into()
     }

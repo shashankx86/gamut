@@ -42,7 +42,7 @@ impl Launcher {
                 previous_layout.collapsed_surface_size()
             }
         {
-            Task::done(Message::SizeChange { id, size })
+            self.request_surface_resize(id, size)
         } else {
             Task::none()
         }

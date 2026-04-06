@@ -46,7 +46,7 @@ mod tests {
         );
 
         assert!(layout.panel_width < 825.0);
-        assert!(layout.results_height < 300.0);
+        assert!(layout.results_height < 396.0);
         assert!(layout.top_margin < 120);
         assert!(layout.panel_width >= 700.0);
     }
@@ -84,7 +84,7 @@ mod tests {
         );
 
         assert!(layout.panel_width > 825.0);
-        assert!(layout.results_height > 300.0);
+        assert!(layout.results_height > 396.0);
     }
 
     #[test]

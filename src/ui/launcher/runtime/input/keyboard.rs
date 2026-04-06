@@ -1,7 +1,7 @@
 use super::super::super::{Launcher, Message};
 use super::key_candidates::{matches_alt_action_key, pressed_key_candidates};
-use iced::Task;
 use iced::keyboard::{self, Key, Modifiers};
+use iced::Task;
 
 impl Launcher {
     pub(in crate::ui::launcher) fn handle_launcher_key_press(
