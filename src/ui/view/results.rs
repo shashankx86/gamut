@@ -97,7 +97,7 @@ impl Launcher {
             .padding(Padding {
                 top: self.layout.results_top_bottom_padding,
                 right: 0.0,
-                bottom: 0.0,
+                bottom: self.layout.results_top_bottom_padding,
                 left: 0.0,
             })
             .into()
