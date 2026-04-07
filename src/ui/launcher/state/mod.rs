@@ -4,9 +4,7 @@ mod lifecycle;
 mod progress;
 mod refresh;
 
-use super::channel::{
-    AppCommandReceiverHandle, IpcReceiverHandle, SearchResultsReceiverHandle,
-};
+use super::channel::{AppCommandReceiverHandle, IpcReceiverHandle, SearchResultsReceiverHandle};
 use super::display::calculator;
 use crate::core::assets::launcher_logo_svg;
 use crate::core::desktop::DesktopApp;

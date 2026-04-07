@@ -101,7 +101,6 @@ impl FromStr for ConfigKey {
             "layoutcustomtopmargin" => Ok(Self::LayoutCustomTopMargin),
             "shortcutslaunchselected" => Ok(Self::Shortcut(ShortcutAction::LaunchSelected)),
             "shortcutsexpand" => Ok(Self::Shortcut(ShortcutAction::Expand)),
-            "shortcutsexpandormovedown" => Ok(Self::Shortcut(ShortcutAction::MoveDown)),
             "shortcutsmovedown" => Ok(Self::Shortcut(ShortcutAction::MoveDown)),
             "shortcutsmoveup" => Ok(Self::Shortcut(ShortcutAction::MoveUp)),
             "shortcutscloselauncher" => Ok(Self::Shortcut(ShortcutAction::CloseLauncher)),

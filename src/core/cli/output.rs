@@ -71,7 +71,7 @@ pub fn config_reset_help_text() -> String {
 
 pub fn shortcut_help_text() -> String {
     format!(
-        "Usage:\n  {name} config shortcut <SUBCOMMAND>\n\nSubcommands:\n  list                                      Show current shortcut bindings\n  set <action> <binding>                    Set a shortcut directly\n  interactive [action]                      Capture a shortcut from live key presses\n\nActions:\n  launch-selected\n  expand\n  move-down\n  move-up\n  close-launcher\n\nBinding format:\n  Use `Modifier+Key`, for example `Ctrl+K`, `Alt+Space`, `Shift+Enter`, `Super+Slash`. Duplicate bindings are allowed.\n\nHelp:\n  {name} help config shortcut list\n  {name} help config shortcut set\n  {name} help config shortcut interactive\n",
+        "Usage:\n  {name} config shortcut <SUBCOMMAND>\n\nSubcommands:\n  list                                      Show current shortcut bindings\n  set <action> <binding>                    Set a shortcut directly\n  interactive [action]                      Capture a shortcut from live key presses\n\nActions:\n  launch-selected\n  expand\n  move-down\n  move-up\n  close-launcher\n\nBinding format:\n  Use virtual keycode arrays, for example `[75]`, `[17, 75]`, or `[17, 18, 16, 75]`. Duplicate bindings are allowed.\n\nHelp:\n  {name} help config shortcut list\n  {name} help config shortcut set\n  {name} help config shortcut interactive\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }
@@ -85,7 +85,7 @@ pub fn shortcut_list_help_text() -> String {
 
 pub fn shortcut_set_help_text() -> String {
     format!(
-        "Usage:\n  {name} config shortcut set <action> <binding>\n\nSet one shortcut directly.\n\nExample:\n  {name} config shortcut set move-up Ctrl+K\n",
+        "Usage:\n  {name} config shortcut set <action> <binding>\n\nSet one shortcut directly.\n\nExample:\n  {name} config shortcut set move-up [17,75]\n",
         name = env!("CARGO_PKG_NAME"),
     )
 }

@@ -1,9 +1,9 @@
-use super::super::display;
 use super::super::Message;
+use super::super::display;
 use super::Launcher;
 use super::ProgressIndicator;
 use iced::widget::operation;
-use iced::{window, Task};
+use iced::{Task, window};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn clear_window_state(&mut self) {

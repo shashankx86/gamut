@@ -3,7 +3,7 @@ mod terminal;
 
 use crate::core::preferences::{ShortcutAction, ShortcutBinding, ShortcutPreferences};
 use keys::{
-    BACKSPACE, CARRIAGE_RETURN, CTRL_C, ENTER, ESCAPE, TAB, apply_csi_modifiers, csi_key_name,
+    BACKSPACE, CARRIAGE_RETURN, CTRL_C, ENTER, ESCAPE, TAB, apply_csi_modifiers, csi_key_code,
     ctrl_alpha_binding, is_csi_final, is_symbol, parse_alt_modified,
 };
 use std::io;
@@ -95,16 +95,18 @@ fn parse_binding(
 ) -> Result<Option<ShortcutBinding>, Box<dyn std::error::Error>> {
     let binding = match first {
         ESCAPE => parse_escape_sequence(stdin)?,
-        ENTER | CARRIAGE_RETURN => ShortcutBinding::named("Enter"),
-        TAB => ShortcutBinding::named("Tab"),
-        BACKSPACE | 0x08 => ShortcutBinding::named("Backspace"),
+        ENTER | CARRIAGE_RETURN => {
+            ShortcutBinding::from_key_code(crate::core::preferences::VK_ENTER)
+        }
+        TAB => ShortcutBinding::from_key_code(crate::core::preferences::VK_TAB),
+        BACKSPACE | 0x08 => ShortcutBinding::from_key_code(crate::core::preferences::VK_BACKSPACE),
         0x01..=0x1a => ctrl_alpha_binding(first),
         byte if byte.is_ascii_uppercase() => ShortcutBinding {
             ctrl: false,
             alt: false,
             shift: true,
             super_key: false,
-            key: (byte as char).to_ascii_lowercase().to_string(),
+            key_codes: vec![byte as u32],
         },
         byte if byte.is_ascii_lowercase() || byte.is_ascii_digit() || is_symbol(byte) => {
             ShortcutBinding {
@@ -112,7 +114,10 @@ fn parse_binding(
                 alt: false,
                 shift: false,
                 super_key: false,
-                key: (byte as char).to_string(),
+                key_codes: vec![
+                    crate::core::preferences::virtual_keycode_from_ascii_char(byte as char)
+                        .ok_or("unsupported key")?,
+                ],
             }
         }
         _ => return Ok(None),
@@ -125,7 +130,9 @@ fn parse_escape_sequence(
     stdin: &mut io::Stdin,
 ) -> Result<ShortcutBinding, Box<dyn std::error::Error>> {
     let Some(next) = read_optional_byte(stdin, ESCAPE_SEQUENCE_WAIT)? else {
-        return Ok(ShortcutBinding::named("Escape"));
+        return Ok(ShortcutBinding::from_key_code(
+            crate::core::preferences::VK_ESCAPE,
+        ));
     };
 
     if next == b'[' {
@@ -151,14 +158,14 @@ fn parse_ss3_sequence(
     let final_byte = read_byte(stdin)?;
 
     let key = match final_byte {
-        b'P' => "F1",
-        b'Q' => "F2",
-        b'R' => "F3",
-        b'S' => "F4",
-        _ => "Escape",
+        b'P' => crate::core::preferences::VK_F1,
+        b'Q' => crate::core::preferences::VK_F1 + 1,
+        b'R' => crate::core::preferences::VK_F1 + 2,
+        b'S' => crate::core::preferences::VK_F1 + 3,
+        _ => crate::core::preferences::VK_ESCAPE,
     };
 
-    Ok(ShortcutBinding::named(key))
+    Ok(ShortcutBinding::from_key_code(key))
 }
 
 fn parse_csi_sequence(
@@ -183,7 +190,8 @@ fn parse_csi_sequence(
         .filter_map(|part| part.parse::<u8>().ok())
         .collect();
 
-    let mut binding = ShortcutBinding::named(csi_key_name(final_byte, codes.first().copied()));
+    let mut binding =
+        ShortcutBinding::from_key_code(csi_key_code(final_byte, codes.first().copied()));
 
     if let Some(modifier_code) = codes.get(1).copied().or_else(|| {
         if matches!(final_byte, b'A' | b'B' | b'C' | b'D' | b'H' | b'F') {
@@ -200,7 +208,7 @@ fn parse_csi_sequence(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_csi_modifiers, csi_key_name, ctrl_alpha_binding, parse_alt_modified};
+    use super::{apply_csi_modifiers, csi_key_code, ctrl_alpha_binding, parse_alt_modified};
     use crate::core::preferences::ShortcutBinding;
 
     #[test]
@@ -208,7 +216,7 @@ mod tests {
         let binding = ctrl_alpha_binding(11);
 
         assert!(binding.ctrl);
-        assert_eq!(binding.key, "k");
+        assert_eq!(binding.key_codes, vec![75]);
     }
 
     #[test]
@@ -217,12 +225,12 @@ mod tests {
 
         assert!(binding.alt);
         assert!(binding.shift);
-        assert_eq!(binding.key, "k");
+        assert_eq!(binding.key_codes, vec![75]);
     }
 
     #[test]
     fn csi_modifier_code_sets_ctrl_shift() {
-        let mut binding = ShortcutBinding::named("ArrowUp");
+        let mut binding = ShortcutBinding::from_key_code(crate::core::preferences::VK_UP);
         apply_csi_modifiers(&mut binding, 6);
 
         assert!(binding.ctrl);
@@ -231,7 +239,10 @@ mod tests {
 
     #[test]
     fn csi_key_name_maps_arrow_keys() {
-        assert_eq!(csi_key_name(b'A', None), "ArrowUp");
-        assert_eq!(csi_key_name(b'~', Some(5)), "PageUp");
+        assert_eq!(csi_key_code(b'A', None), crate::core::preferences::VK_UP);
+        assert_eq!(
+            csi_key_code(b'~', Some(5)),
+            crate::core::preferences::VK_PAGE_UP
+        );
     }
 }

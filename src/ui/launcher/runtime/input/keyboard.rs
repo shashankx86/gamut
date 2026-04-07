@@ -1,7 +1,7 @@
 use super::super::super::{Launcher, Message};
-use super::key_candidates::{matches_alt_action_key, pressed_key_candidates};
-use iced::keyboard::{self, Key, Modifiers};
+use super::key_candidates::{matches_alt_action_key, pressed_keycode_candidates};
 use iced::Task;
+use iced::keyboard::{self, Key, Modifiers};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn handle_launcher_key_press(
@@ -121,10 +121,8 @@ impl Launcher {
             return false;
         }
 
-        let expected = binding.normalized_key();
-
-        pressed_key_candidates(key, physical_key)
+        pressed_keycode_candidates(key, physical_key)
             .into_iter()
-            .any(|pressed| pressed == expected)
+            .any(|pressed| binding.key_codes.contains(&pressed))
     }
 }

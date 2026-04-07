@@ -1,13 +1,13 @@
 use super::{
-    button, calculator_badge_style, calculator_card_style, column, container, image, keyed_column,
-    normalize_result_display_value, results_scroll_style, truncate_middle_with_ellipsis,
-    DesktopApp, Launcher, Length, Message, Padding, RESULT_META_LABEL_WIDTH,
-    RESULT_META_TEXT_MIN_SIZE,
-};
-use super::{number_text_for_value, row, scrollable, svg, text, trim_label};
-use super::{
     CALC_MAX_BADGE_CHARS, CALC_MAX_HEADLINE_CHARS, CALC_MIN_BADGE_CHARS, CALC_MIN_HEADLINE_CHARS,
 };
+use super::{
+    DesktopApp, Launcher, Length, Message, Padding, RESULT_META_LABEL_WIDTH,
+    RESULT_META_TEXT_MIN_SIZE, button, calculator_badge_style, calculator_card_style, column,
+    container, image, keyed_column, normalize_result_display_value, results_scroll_style,
+    truncate_middle_with_ellipsis,
+};
+use super::{number_text_for_value, row, scrollable, svg, text, trim_label};
 use iced::{ContentFit, Element};
 
 impl Launcher {

@@ -5,9 +5,9 @@ mod scrolling;
 
 #[cfg(test)]
 mod tests {
-    use super::key_candidates::normalize_binding_key;
     use crate::core::app_command::AppCommand;
     use crate::core::desktop::DesktopApp;
+    use crate::core::preferences::{VK_DOWN, VK_PAGE_UP, virtual_keycode_from_token};
     use crate::ui::launcher::Launcher;
     use std::sync::mpsc;
 
@@ -34,9 +34,9 @@ mod tests {
     }
 
     #[test]
-    fn binding_key_normalization_ignores_spacing_and_case() {
-        assert_eq!(normalize_binding_key(" Arrow-Down "), "arrowdown");
-        assert_eq!(normalize_binding_key("Page_Up"), "pageup");
+    fn key_tokens_map_to_virtual_keycodes() {
+        assert_eq!(virtual_keycode_from_token(" Arrow-Down "), Some(VK_DOWN));
+        assert_eq!(virtual_keycode_from_token("Page_Up"), Some(VK_PAGE_UP));
     }
 
     #[test]

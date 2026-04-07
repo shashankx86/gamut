@@ -48,17 +48,30 @@ placement = "raised_center"
 custom_top_margin = 120.0
 
 [shortcuts]
-# Key binding to launch the selected item
-launch_selected     = { ctrl = false, alt = false, shift = false, super_key = false, key = "Enter" }
+# ====================================================================
+# SHORTCUT CONFIGURATION
+# To change shortcuts, use integer Virtual Keycodes.
+#
+# Format:
+# action = [modifier_code, key_code]
+# action = [key_code]
+# action = [modifier_code, key_code, key_code, ...]
+# ====================================================================
 
-# Key binding to expand a result or move the selection down
-expand_or_move_down = { ctrl = false, alt = false, shift = false, super_key = false, key = "ArrowDown" }
+# Launch selected item
+launch_selected = [13]
 
-# Key binding to move the selection up
-move_up             = { ctrl = false, alt = false, shift = false, super_key = false, key = "ArrowUp" }
+# Expand results
+expand = [40]
 
-# Key binding to close the launcher
-close_launcher      = { ctrl = false, alt = false, shift = false, super_key = false, key = "Escape" }
+# Move selection down
+move_down = [40]
+
+# Move selection up
+move_up = [38]
+
+# Close launcher
+close_launcher = [27]
 
 [system]
 # Launch the daemon automatically when the desktop session starts
@@ -72,7 +85,7 @@ gamut config show
 gamut config get appearance.theme
 gamut config set layout.placement custom
 gamut config set layout.custom_top_margin 96
-gamut config shortcut set close-launcher Ctrl+Q
+gamut config shortcut set close-launcher [17,81]
 gamut config shortcut interactive
 ```
 
@@ -146,39 +159,48 @@ Distance in pixels from the top of the screen when `placement = "custom"`. Defau
 
 ## Shortcuts
 
-Each shortcut is a table with modifier booleans and a `key` string.
+Each shortcut is an array of integer Virtual Keycodes.
 
 ```toml
 [shortcuts]
-launch_selected = { ctrl = false, alt = false, shift = false, super_key = false, key = "Enter" }
+launch_selected = [13]
 ```
 
-### Available modifier fields
+### Format
 
-| Field | Modifier key |
+| Pattern | Description |
 |---|---|
-| `ctrl` | Ctrl / Control |
-| `alt` | Alt |
-| `shift` | Shift |
-| `super_key` | Super / Meta / Win / Cmd |
+| `[key_code]` | Single-key shortcut |
+| `[modifier_code, key_code]` | One modifier plus key |
+| `[modifier_code, key_code, key_code, ...]` | One modifier plus multiple trigger keys |
 
-### `key` format
+### Common modifier codes
 
-Use the standard key name. Common values:
+| Key | Code |
+|---|---|
+| `Shift` | `16` |
+| `Ctrl` | `17` |
+| `Alt` | `18` |
+| `Super` / `Meta` | `91` |
 
-- Named keys: `Enter`, `Escape`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Space`
-- Single characters: `a`, `b`, `1`, `/`, etc.
+### Common key codes
 
-Key names are matched case-insensitively.
+| Key | Code |
+|---|---|
+| `Enter` | `13` |
+| `Escape` | `27` |
+| `ArrowUp` | `38` |
+| `ArrowDown` | `40` |
 
 ### Configurable actions
 
 | Setting | Default | Description |
 |---|---|---|
-| `launch_selected` | `Enter` | Launch the focused application |
-| `expand_or_move_down` | `ArrowDown` | Move selection down |
-| `move_up` | `ArrowUp` | Move selection up |
-| `close_launcher` | `Escape` | Close the launcher |
+| `launch_selected` | `[13]` | Launch the focused application |
+| `expand` | `[40]` | Expand results |
+| `move_down` | `[40]` | Move selection down |
+| `move_up` | `[38]` | Move selection up |
+| `close_launcher` | `[27]` | Close the launcher |
 
 ---
 

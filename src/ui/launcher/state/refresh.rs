@@ -1,7 +1,9 @@
-use super::super::channel::{AppCommandReceiverHandle, IpcReceiverHandle};
 use super::super::Message;
+use super::super::channel::{AppCommandReceiverHandle, IpcReceiverHandle};
 use super::Launcher;
-use crate::core::desktop::{IconResolveRequest, refresh_app_cache, resolve_icon_requests, save_cached_apps};
+use crate::core::desktop::{
+    IconResolveRequest, refresh_app_cache, resolve_icon_requests, save_cached_apps,
+};
 use iced::Task;
 use log::warn;
 use std::path::PathBuf;
@@ -58,7 +60,10 @@ impl Launcher {
         Task::perform(async { refresh_app_cache() }, Message::AppsLoaded)
     }
 
-    pub(in crate::ui::launcher) fn apply_resolved_icons(&mut self, updates: Vec<(usize, Option<PathBuf>)>) {
+    pub(in crate::ui::launcher) fn apply_resolved_icons(
+        &mut self,
+        updates: Vec<(usize, Option<PathBuf>)>,
+    ) {
         let mut changed = false;
 
         for (index, icon_path) in updates {

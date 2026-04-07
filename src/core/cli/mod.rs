@@ -32,7 +32,7 @@ mod tests {
         let help = shortcut_help_text();
 
         assert!(help.contains("interactive"));
-        assert!(help.contains("Modifier+Key"));
+        assert!(help.contains("virtual keycode arrays"));
         assert!(help.contains("move-down"));
     }
 

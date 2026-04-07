@@ -139,10 +139,10 @@ mod tests {
 
         ConfigKey::from_str("shortcuts.move_up")
             .expect("key should parse")
-            .set_value(&mut preferences, "Ctrl+K")
+            .set_value(&mut preferences, "[17, 75]")
             .expect("shortcut should update");
 
-        assert_eq!(preferences.shortcuts.move_up.to_string(), "Ctrl+K");
+        assert_eq!(preferences.shortcuts.move_up.to_string(), "[17, 75]");
     }
 
     #[test]

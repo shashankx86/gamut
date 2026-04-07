@@ -135,11 +135,11 @@ mod tests {
     #[test]
     fn parses_shortcut_commands() {
         assert_eq!(
-            parse(&["config", "shortcut", "set", "move-up", "Ctrl+K"])
+            parse(&["config", "shortcut", "set", "move-up", "[17,75]"])
                 .expect("shortcut set should parse"),
             CliCommand::Config(ConfigCommand::Shortcut(ShortcutConfigCommand::Set {
                 action: ShortcutAction::MoveUp,
-                binding: "Ctrl+K".to_string(),
+                binding: "[17,75]".to_string(),
             })),
         );
         assert_eq!(

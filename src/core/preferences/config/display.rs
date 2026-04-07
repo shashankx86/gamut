@@ -1,6 +1,6 @@
 use super::ConfigKey;
 use crate::core::preferences::{
-    AppPreferences, ShortcutAction, ShortcutPreferences, ThemeColors, config_path, load_preferences,
+    config_path, load_preferences, AppPreferences, ShortcutAction, ShortcutPreferences, ThemeColors,
 };
 
 pub(super) fn show_preferences() {
@@ -45,7 +45,8 @@ pub(super) fn show_preferences() {
 
 pub(super) fn print_shortcuts(shortcuts: &ShortcutPreferences) {
     for action in ShortcutAction::ALL {
-        println!("{} = {}", action.config_key(), shortcuts.binding(action));
+        let key = action.config_key().trim_start_matches("shortcuts.");
+        println!("{key} = {}", shortcuts.binding(action));
     }
 }
 

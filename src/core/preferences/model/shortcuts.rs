@@ -1,9 +1,32 @@
-use serde::de::Deserializer;
-use serde::{Deserialize, Serialize};
+use serde::de::{Deserializer, Error as DeError};
+use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+pub const VK_SHIFT: u32 = 16;
+pub const VK_CONTROL: u32 = 17;
+pub const VK_ALT: u32 = 18;
+pub const VK_SUPER: u32 = 91;
+pub const VK_BACKSPACE: u32 = 8;
+pub const VK_TAB: u32 = 9;
+pub const VK_ENTER: u32 = 13;
+pub const VK_ESCAPE: u32 = 27;
+pub const VK_SPACE: u32 = 32;
+pub const VK_LEFT: u32 = 37;
+pub const VK_UP: u32 = 38;
+pub const VK_RIGHT: u32 = 39;
+pub const VK_DOWN: u32 = 40;
+pub const VK_PAGE_UP: u32 = 33;
+pub const VK_PAGE_DOWN: u32 = 34;
+pub const VK_END: u32 = 35;
+pub const VK_HOME: u32 = 36;
+pub const VK_INSERT: u32 = 45;
+pub const VK_DELETE: u32 = 46;
+pub const VK_NUMPAD_0: u32 = 96;
+pub const VK_F1: u32 = 112;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ShortcutPreferences {
     pub launch_selected: ShortcutBinding,
     pub expand: ShortcutBinding,
@@ -12,63 +35,14 @@ pub struct ShortcutPreferences {
     pub close_launcher: ShortcutBinding,
 }
 
-impl<'de> Deserialize<'de> for ShortcutPreferences {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(default)]
-        struct ShortcutPreferencesWire {
-            launch_selected: ShortcutBinding,
-            expand: Option<ShortcutBinding>,
-            move_down: Option<ShortcutBinding>,
-            #[serde(alias = "expand_or_move_down")]
-            legacy_expand_or_move_down: Option<ShortcutBinding>,
-            move_up: ShortcutBinding,
-            close_launcher: ShortcutBinding,
-        }
-
-        impl Default for ShortcutPreferencesWire {
-            fn default() -> Self {
-                let defaults = ShortcutPreferences::default();
-
-                Self {
-                    launch_selected: defaults.launch_selected,
-                    expand: Some(defaults.expand),
-                    move_down: Some(defaults.move_down),
-                    legacy_expand_or_move_down: None,
-                    move_up: defaults.move_up,
-                    close_launcher: defaults.close_launcher,
-                }
-            }
-        }
-
-        let wire = ShortcutPreferencesWire::deserialize(deserializer)?;
-        let legacy = wire.legacy_expand_or_move_down.clone();
-        let defaults = ShortcutPreferences::default();
-
-        Ok(Self {
-            launch_selected: wire.launch_selected,
-            expand: wire
-                .expand
-                .or_else(|| legacy.clone())
-                .unwrap_or(defaults.expand),
-            move_down: wire.move_down.or(legacy).unwrap_or(defaults.move_down),
-            move_up: wire.move_up,
-            close_launcher: wire.close_launcher,
-        })
-    }
-}
-
 impl Default for ShortcutPreferences {
     fn default() -> Self {
         Self {
-            launch_selected: ShortcutBinding::named("Enter"),
-            expand: ShortcutBinding::named("ArrowDown"),
-            move_down: ShortcutBinding::named("ArrowDown"),
-            move_up: ShortcutBinding::named("ArrowUp"),
-            close_launcher: ShortcutBinding::named("Escape"),
+            launch_selected: ShortcutBinding::from_key_code(VK_ENTER),
+            expand: ShortcutBinding::from_key_code(VK_DOWN),
+            move_down: ShortcutBinding::from_key_code(VK_DOWN),
+            move_up: ShortcutBinding::from_key_code(VK_UP),
+            close_launcher: ShortcutBinding::from_key_code(VK_ESCAPE),
         }
     }
 }
@@ -176,7 +150,6 @@ impl FromStr for ShortcutAction {
         match crate::core::preferences::normalize_identifier(value).as_str() {
             "launchselected" | "shortcutslaunchselected" => Ok(Self::LaunchSelected),
             "expand" | "shortcutsexpand" => Ok(Self::Expand),
-            "expandormovedown" => Ok(Self::MoveDown),
             "movedown" | "shortcutsmovedown" => Ok(Self::MoveDown),
             "moveup" | "shortcutsmoveup" => Ok(Self::MoveUp),
             "closelauncher" | "shortcutscloselauncher" => Ok(Self::CloseLauncher),
@@ -188,50 +161,218 @@ impl FromStr for ShortcutAction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShortcutBinding {
     pub ctrl: bool,
     pub alt: bool,
     pub shift: bool,
     pub super_key: bool,
-    pub key: String,
+    pub key_codes: Vec<u32>,
 }
 
 impl ShortcutBinding {
-    pub fn named(key: &str) -> Self {
+    pub fn from_key_code(key_code: u32) -> Self {
         Self {
             ctrl: false,
             alt: false,
             shift: false,
             super_key: false,
-            key: key.to_string(),
+            key_codes: vec![key_code],
         }
     }
 
-    pub fn normalized_key(&self) -> String {
-        crate::core::preferences::normalize_key_token(&self.key)
+    pub fn to_keycode_array(&self) -> Vec<u32> {
+        let mut codes = Vec::new();
+
+        if self.ctrl {
+            codes.push(VK_CONTROL);
+        }
+        if self.alt {
+            codes.push(VK_ALT);
+        }
+        if self.shift {
+            codes.push(VK_SHIFT);
+        }
+        if self.super_key {
+            codes.push(VK_SUPER);
+        }
+
+        for code in &self.key_codes {
+            if !codes.contains(code) {
+                codes.push(*code);
+            }
+        }
+
+        codes
+    }
+
+    fn from_keycode_array(codes: Vec<u32>) -> Result<Self, String> {
+        let mut binding = Self {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            super_key: false,
+            key_codes: Vec::new(),
+        };
+
+        for code in codes {
+            match code {
+                VK_CONTROL => binding.ctrl = true,
+                VK_ALT => binding.alt = true,
+                VK_SHIFT => binding.shift = true,
+                VK_SUPER => binding.super_key = true,
+                _ => {
+                    if !binding.key_codes.contains(&code) {
+                        binding.key_codes.push(code);
+                    }
+                }
+            }
+        }
+
+        if binding.key_codes.is_empty() {
+            return Err("shortcut must include at least one key code".to_string());
+        }
+
+        Ok(binding)
+    }
+}
+
+pub(crate) fn virtual_keycode_from_ascii_char(ch: char) -> Option<u32> {
+    if ch.is_ascii_alphabetic() {
+        return Some(ch.to_ascii_uppercase() as u32);
+    }
+
+    if ch.is_ascii_digit() {
+        return Some(ch as u32);
+    }
+
+    match ch {
+        '/' => Some(191),
+        '\\' => Some(220),
+        '.' => Some(190),
+        ',' => Some(188),
+        ';' => Some(186),
+        '\'' => Some(222),
+        '[' => Some(219),
+        ']' => Some(221),
+        '-' => Some(189),
+        '=' => Some(187),
+        '`' => Some(192),
+        _ => None,
+    }
+}
+
+pub(crate) fn virtual_keycode_from_token(value: &str) -> Option<u32> {
+    let normalized = crate::core::preferences::normalize_key_token(value);
+
+    if normalized.is_empty() {
+        return None;
+    }
+
+    match normalized.as_str() {
+        "ctrl" | "control" | "controlleft" | "controlright" => Some(VK_CONTROL),
+        "alt" | "altleft" | "altright" => Some(VK_ALT),
+        "shift" | "shiftleft" | "shiftright" => Some(VK_SHIFT),
+        "super" | "meta" | "cmd" | "command" | "win" | "metaleft" | "metaright" => Some(VK_SUPER),
+        "enter" | "return" => Some(VK_ENTER),
+        "escape" | "esc" => Some(VK_ESCAPE),
+        "tab" => Some(VK_TAB),
+        "backspace" => Some(VK_BACKSPACE),
+        "space" | "spacebar" => Some(VK_SPACE),
+        "left" | "arrowleft" => Some(VK_LEFT),
+        "up" | "arrowup" => Some(VK_UP),
+        "right" | "arrowright" => Some(VK_RIGHT),
+        "down" | "arrowdown" => Some(VK_DOWN),
+        "pageup" => Some(VK_PAGE_UP),
+        "pagedown" => Some(VK_PAGE_DOWN),
+        "home" => Some(VK_HOME),
+        "end" => Some(VK_END),
+        "insert" => Some(VK_INSERT),
+        "delete" => Some(VK_DELETE),
+        "slash" => Some(191),
+        "backslash" => Some(220),
+        "period" => Some(190),
+        "comma" => Some(188),
+        "semicolon" => Some(186),
+        "quote" => Some(222),
+        "bracketleft" => Some(219),
+        "bracketright" => Some(221),
+        "minus" => Some(189),
+        "equal" => Some(187),
+        "backquote" => Some(192),
+        _ => {
+            if let Some(value) = normalized.strip_prefix("key")
+                && value.len() == 1
+            {
+                return value
+                    .chars()
+                    .next()
+                    .and_then(virtual_keycode_from_ascii_char);
+            }
+
+            if let Some(value) = normalized.strip_prefix("digit")
+                && value.len() == 1
+            {
+                return value
+                    .chars()
+                    .next()
+                    .and_then(virtual_keycode_from_ascii_char);
+            }
+
+            if let Some(value) = normalized.strip_prefix("numpad")
+                && value.len() == 1
+                && let Some(digit) = value.chars().next().and_then(|ch| ch.to_digit(10))
+            {
+                return Some(VK_NUMPAD_0 + digit);
+            }
+
+            if let Some(value) = normalized.strip_prefix('f')
+                && let Ok(number) = value.parse::<u32>()
+                && (1..=12).contains(&number)
+            {
+                return Some(VK_F1 + number - 1);
+            }
+
+            if normalized.len() == 1 {
+                return normalized
+                    .chars()
+                    .next()
+                    .and_then(virtual_keycode_from_ascii_char);
+            }
+
+            None
+        }
+    }
+}
+
+impl Serialize for ShortcutBinding {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_keycode_array().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ShortcutBinding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let codes = Vec::<u32>::deserialize(deserializer)?;
+        Self::from_keycode_array(codes).map_err(D::Error::custom)
     }
 }
 
 impl fmt::Display for ShortcutBinding {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut parts = Vec::new();
-
-        if self.ctrl {
-            parts.push("Ctrl".to_string());
-        }
-        if self.alt {
-            parts.push("Alt".to_string());
-        }
-        if self.shift {
-            parts.push("Shift".to_string());
-        }
-        if self.super_key {
-            parts.push("Super".to_string());
-        }
-
-        parts.push(pretty_key_name(&self.key));
-        write!(f, "{}", parts.join("+"))
+        let values = self
+            .to_keycode_array()
+            .into_iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(f, "[{values}]")
     }
 }
 
@@ -239,56 +380,15 @@ impl FromStr for ShortcutBinding {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let mut binding = Self::named("");
-        let mut key: Option<String> = None;
-
-        for part in value
-            .split('+')
-            .map(str::trim)
-            .filter(|part| !part.is_empty())
-        {
-            match part.to_ascii_lowercase().as_str() {
-                "ctrl" | "control" => binding.ctrl = true,
-                "alt" => binding.alt = true,
-                "shift" => binding.shift = true,
-                "super" | "meta" | "cmd" | "command" | "win" => binding.super_key = true,
-                _ => {
-                    if key.is_some() {
-                        return Err("shortcut can only contain one key".to_string());
-                    }
-
-                    let normalized = crate::core::preferences::normalize_key_token(part);
-                    if normalized.is_empty() {
-                        return Err("shortcut key cannot be empty".to_string());
-                    }
-
-                    key = Some(normalized);
-                }
-            }
+        #[derive(Deserialize)]
+        struct ShortcutBindingWrapper {
+            binding: ShortcutBinding,
         }
 
-        binding.key = key.ok_or_else(|| "shortcut must include a key".to_string())?;
-        Ok(binding)
-    }
-}
-
-fn pretty_key_name(key: &str) -> String {
-    match crate::core::preferences::normalize_key_token(key).as_str() {
-        "arrowup" => "ArrowUp".to_string(),
-        "arrowdown" => "ArrowDown".to_string(),
-        "arrowleft" => "ArrowLeft".to_string(),
-        "arrowright" => "ArrowRight".to_string(),
-        "escape" => "Escape".to_string(),
-        "enter" => "Enter".to_string(),
-        "space" => "Space".to_string(),
-        normalized if normalized.len() == 1 => normalized.to_ascii_uppercase(),
-        normalized => {
-            let mut chars = normalized.chars();
-            match chars.next() {
-                Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
-                None => String::new(),
-            }
-        }
+        let wrapped = format!("binding = {value}");
+        toml::from_str::<ShortcutBindingWrapper>(&wrapped)
+            .map(|wrapper| wrapper.binding)
+            .map_err(|error| format!("shortcut must be a keycode array like [17, 75]: {error}"))
     }
 }
 
@@ -316,49 +416,24 @@ mod tests {
         shortcuts
             .update_binding(
                 ShortcutAction::MoveUp,
-                ShortcutBinding::from_str("ArrowDown").expect("binding should parse"),
+                ShortcutBinding::from_str("[40]").expect("binding should parse"),
             )
             .expect("duplicate bindings should be allowed");
 
-        assert_eq!(shortcuts.move_up.to_string(), "ArrowDown");
+        assert_eq!(shortcuts.move_up.to_string(), "[40]");
     }
 
     #[test]
-    fn legacy_expand_or_move_down_migrates_to_expand_and_move_down() {
-        let shortcuts: ShortcutPreferences = toml::from_str(
-            r#"
-[launch_selected]
-ctrl = false
-alt = false
-shift = false
-super_key = false
-key = "Enter"
+    fn shortcut_binding_parses_modifier_and_multiple_key_codes() {
+        let binding = ShortcutBinding::from_str("[17, 40, 74]").expect("binding should parse");
 
-[expand_or_move_down]
-ctrl = false
-alt = false
-shift = false
-super_key = false
-key = "ArrowDown"
+        assert!(binding.ctrl);
+        assert_eq!(binding.key_codes, vec![40, 74]);
+    }
 
-[move_up]
-ctrl = false
-alt = false
-shift = false
-super_key = false
-key = "ArrowUp"
-
-[close_launcher]
-ctrl = false
-alt = false
-shift = false
-super_key = false
-key = "Escape"
-"#,
-        )
-        .expect("legacy shortcut config should parse");
-
-        assert_eq!(shortcuts.expand.to_string(), "ArrowDown");
-        assert_eq!(shortcuts.move_down.to_string(), "ArrowDown");
+    #[test]
+    fn shortcut_binding_rejects_modifier_only_arrays() {
+        let error = ShortcutBinding::from_str("[17]").expect_err("binding should be rejected");
+        assert!(error.contains("at least one key code"));
     }
 }

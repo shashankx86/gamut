@@ -2,7 +2,7 @@ use super::super::Message;
 use super::Launcher;
 use crate::core::preferences::load_preferences;
 use crate::ui::layout::LauncherLayout;
-use iced::{window, Size, Task};
+use iced::{Size, Task, window};
 
 impl Launcher {
     pub(in crate::ui::launcher) fn update_layout(

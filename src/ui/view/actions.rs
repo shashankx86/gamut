@@ -1,7 +1,7 @@
 use super::{
-    action_card_style, column, container, float, icon_external_link, icon_folder_open, opaque, row,
-    space, text, Launcher, Message, ACTION_CARD_MIN_COMPACT_WIDTH, ACTION_CARD_MIN_WIDTH,
-    ACTION_OVERLAY_BOTTOM_OFFSET, ACTION_OVERLAY_RIGHT_OFFSET,
+    ACTION_CARD_MIN_COMPACT_WIDTH, ACTION_CARD_MIN_WIDTH, ACTION_OVERLAY_BOTTOM_OFFSET,
+    ACTION_OVERLAY_RIGHT_OFFSET, Launcher, Message, action_card_style, column, container, float,
+    icon_external_link, icon_folder_open, opaque, row, space, text,
 };
 use iced::{Element, Font, Length};
 

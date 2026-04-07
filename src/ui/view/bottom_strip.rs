@@ -1,7 +1,7 @@
 use super::{
-    action_icon_button, bottom_strip_shadcn_theme, bottom_strip_style, container,
-    icon_chevron_down, icon_corner_down_left, icon_ellipsis_vertical, row, space, text, tooltip,
-    BottomStripAction, Launcher, Message, BOTTOM_STRIP_ICON_SIZE,
+    BOTTOM_STRIP_ICON_SIZE, BottomStripAction, Launcher, Message, action_icon_button,
+    bottom_strip_shadcn_theme, bottom_strip_style, container, icon_chevron_down,
+    icon_corner_down_left, icon_ellipsis_vertical, row, space, text, tooltip,
 };
 use iced::{Element, Length};
 
